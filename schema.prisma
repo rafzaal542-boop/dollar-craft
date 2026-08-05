@@ -1,0 +1,160 @@
+// ==========================================
+// DOLLAR CRAFT - PRIMSA DATABASE SCHEMA
+// Production PostgreSQL Configuration
+// High-Precision Decimal Yield Engine
+// ==========================================
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum DepositStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  FROZEN
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  YIELD_ACCRUAL
+  REFERRAL_BONUS
+  ADMIN_ADJUSTMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PROCESSING
+}
+
+model User {
+  id             String         @id @default(uuid())
+  email          String         @unique
+  passwordHash   String
+  walletAddress  String?
+  role           Role           @default(USER)
+  tier           String         @default("BRONZE") // BRONZE, SILVER, GOLD, PLATINUM, VIP
+  referralCode   String         @unique
+  referredBy     String?
+  isFrozen       Boolean        @default(false)
+  frozenReason   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Balance fields using high-precision Decimal
+  principalBalance Decimal      @default(0) @db.Decimal(36, 18)
+  earnedYield      Decimal      @default(0) @db.Decimal(36, 18)
+  totalWithdrawn   Decimal      @default(0) @db.Decimal(36, 18)
+
+  // Relationships
+  deposits         UserDeposit[]
+  transactions     Transaction[]
+  referralsGiven   ReferralReward[] @relation("ReferrerRewards")
+  referralsEarned  ReferralReward[] @relation("ReferredUserRewards")
+  auditLogs        AuditLog[]
+
+  @@index([email])
+  @@index([referralCode])
+}
+
+model InvestmentPlan {
+  id                   String        @id @default(uuid())
+  name                 String
+  dailyYieldPercent    Decimal       @db.Decimal(10, 6) // e.g., 2.500000 for 2.5% daily
+  durationDays         Int           // e.g., 30 days
+  minDeposit           Decimal       @db.Decimal(24, 8)
+  maxDeposit           Decimal       @db.Decimal(24, 8)
+  cycleIntervalSeconds Int           @default(1) // Tick interval in seconds (e.g., 1s for real-time streaming)
+  active               Boolean       @default(true)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  deposits             UserDeposit[]
+}
+
+model UserDeposit {
+  id                   String        @id @default(uuid())
+  userId               String
+  planId               String
+  principalAmount      Decimal       @db.Decimal(36, 18)
+  earnedYield          Decimal       @default(0) @db.Decimal(36, 18)
+  totalPayout          Decimal       @default(0) @db.Decimal(36, 18)
+  dailyYieldOverride   Decimal?      @db.Decimal(10, 6) // Admin override if custom rate granted
+  cryptoNetwork        String        @default("USDT_TRC20") // USDT_TRC20, USDT_BEP20, etc.
+  txHash               String?
+  status               DepositStatus @default(ACTIVE)
+  startTime            DateTime      @default(now())
+  endTime              DateTime
+  lastYieldTick        DateTime      @default(now())
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                 InvestmentPlan @relation(fields: [planId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([lastYieldTick])
+}
+
+model Transaction {
+  id              String            @id @default(uuid())
+  userId          String
+  type            TransactionType
+  amount          Decimal           @db.Decimal(36, 18)
+  precisionAmount String            // Full string representation up to 18 decimals for zero truncation loss
+  txHash          String?
+  destinationAddr String?
+  cryptoNetwork   String?
+  status          TransactionStatus @default(PENDING)
+  flaggedByFraud  Boolean           @default(false)
+  fraudNote       String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+}
+
+model ReferralReward {
+  id             String   @id @default(uuid())
+  referrerId     String
+  referredUserId String
+  amount         Decimal  @db.Decimal(36, 18)
+  level          Int      // Level 1 (5%), Level 2 (2.5%), Level 3 (1.0%)
+  createdAt      DateTime @default(now())
+
+  referrer       User     @relation("ReferrerRewards", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUser   User     @relation("ReferredUserRewards", fields: [referredUserId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+  @@index([referredUserId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  adminId   String?
+  action    String
+  details   String
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}

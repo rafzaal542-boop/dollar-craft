@@ -1,0 +1,6 @@
+{
+  "name": "Dollar Craft",
+  "description": "High-precision digital yield and investment cycle engine with real-time micro-yield accrual.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="bF" x1="15%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="30%" stop-color="#3B82F6" />
+      <stop offset="70%" stop-color="#1D4ED8" />
+      <stop offset="100%" stop-color="#1E3A8A" />
+    </linearGradient>
+    <linearGradient id="bE" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E40AF" />
+      <stop offset="50%" stop-color="#1E3A8A" />
+      <stop offset="100%" stop-color="#0B132B" />
+    </linearGradient>
+    <linearGradient id="bH" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#E0F2FE" />
+      <stop offset="50%" stop-color="#93C5FD" />
+      <stop offset="100%" stop-color="#2563EB" />
+    </linearGradient>
+    <linearGradient id="cF" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="25%" stop-color="#E2E8F0" />
+      <stop offset="60%" stop-color="#94A3B8" />
+      <stop offset="100%" stop-color="#475569" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Base Circle -->
+  <circle cx="60" cy="60" r="56" fill="#070B14"/>
+
+  <!-- Chrome Outer Arc (Top-Right) -->
+  <path d="M 62 10 C 85 10, 104 26, 105 50 C 106 58, 103 66, 97 74 L 91 68 C 95 62, 96 56, 95 50 C 93 31, 78 18, 60 18 Z" fill="url(#cF)" stroke="#F8FAFC" stroke-width="0.5"/>
+
+  <!-- Blue Crescent Ring -->
+  <path d="M 58 10 C 30 10, 8 32, 8 60 C 8 88, 28 108, 62 108 C 76 108, 88 102, 96 92 L 90 86 C 83 94, 73 98, 60 98 C 34 98, 18 80, 18 60 C 18 40, 34 20, 58 18 Z" fill="url(#bE)"/>
+  <path d="M 56 8 C 28 8, 6 30, 6 58 C 6 86, 26 106, 60 106 C 74 106, 86 100, 94 90 L 88 84 C 81 92, 71 96, 58 96 C 32 96, 16 78, 16 58 C 16 38, 32 18, 56 16 Z" fill="url(#bF)"/>
+
+  <!-- Silver Ascending Bar Chart (Bottom Right) -->
+  <path d="M 50 80 L 56 80 L 56 94 L 50 94 Z" fill="url(#cF)"/>
+  <path d="M 60 72 L 66 72 L 66 94 L 60 94 Z" fill="url(#cF)"/>
+  <path d="M 70 62 L 76 62 L 76 94 L 70 94 Z" fill="url(#cF)"/>
+  <path d="M 80 50 L 86 50 L 86 94 L 80 94 Z" fill="url(#cF)"/>
+
+  <!-- Central 3D Metallic Blue Dollar Sign ($) -->
+  <text x="52" y="63" fill="#030712" font-size="52" font-weight="900" font-family="Arial Black, sans-serif" text-anchor="middle" dominant-baseline="central">$</text>
+  <text x="50" y="61" fill="url(#bE)" font-size="52" font-weight="900" font-family="Arial Black, sans-serif" text-anchor="middle" dominant-baseline="central">$</text>
+  <text x="48" y="58" fill="url(#bF)" stroke="url(#bH)" stroke-width="1" font-size="52" font-weight="900" font-family="Arial Black, sans-serif" text-anchor="middle" dominant-baseline="central">$</text>
+
+  <!-- 3D Upward Blue Arrow -->
+  <path d="M 16 82 C 26 78, 46 70, 68 52 L 92 32" fill="none" stroke="url(#bF)" stroke-width="8" stroke-linecap="round"/>
+  <path d="M 16 80 C 26 76, 46 68, 68 50 L 92 30" fill="none" stroke="url(#bH)" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M 82 22 L 110 22 L 96 46 Z" fill="url(#bF)" stroke="url(#bH)" stroke-width="1.5"/>
+</svg>

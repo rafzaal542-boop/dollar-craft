@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Dollar Craft user account, tier, and balance state",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "principalBalance": { "type": "number" },
+        "earnedYield": { "type": "number" },
+        "totalWithdrawn": { "type": "number" },
+        "tier": { "type": "string" },
+        "role": { "type": "string" },
+        "referralCode": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Deposit": {
+      "title": "Deposit Contract",
+      "description": "User deposit record awaiting admin manual verification or approved",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "planId": { "type": "string" },
+        "amount": { "type": "number" },
+        "transactionId": { "type": "string", "minLength": 8, "maxLength": 20 },
+        "bankName": { "type": "string" },
+        "dailyYieldPercent": { "type": "number" },
+        "network": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "PENDING", "APPROVED", "REJECTED", "ACTIVE"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "amount", "transactionId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User accounts collection"
+    },
+    "/deposits/{depositId}": {
+      "schema": { "$ref": "#/entities/Deposit" },
+      "description": "Yield contract deposits"
+    }
+  }
+}
