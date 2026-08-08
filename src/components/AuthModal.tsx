@@ -48,7 +48,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onLogout,
   initialMode = 'login'
 }) => {
-  const [step, setStep] = useState<number>(1); // Step 1: Personal, Step 2: Security, Step 3: Contact
+  const [step, setStep] = useState<number>(1);
   const [isLoginView, setIsLoginView] = useState<boolean>(initialMode === 'login');
 
   const [email, setEmail] = useState('');
@@ -67,7 +67,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isForgotPasswordView, setIsForgotPasswordView] = useState(false);
   const [resetSuccessMsg, setResetSuccessMsg] = useState('');
 
-  // Google New User Onboarding & Account Selector state
   const [showGoogleOnboarding, setShowGoogleOnboarding] = useState<boolean>(false);
   const [showGoogleAccountPicker, setShowGoogleAccountPicker] = useState<boolean>(false);
   const [googlePickerEmail, setGooglePickerEmail] = useState<string>('');
@@ -227,7 +226,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Error updating profile.');
-    } font-sans finally {
+    } finally {
       setOnboardingSubmitting(false);
     }
   };
@@ -248,7 +247,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Google SVG Icon component
   const GoogleIcon = () => (
     <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
       <path
@@ -305,7 +303,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setShowGoogleAccountPicker(false);
         if (!isLoginView) {
           if (!data.isNewUser) {
-            // User tried to Sign Up with a Google account that is ALREADY registered!
             setAlreadyRegisteredNotice({ user: data.user, email: data.user.email });
             setErrorMsg('');
           } else if (!data.user.hasCompletedOnboarding) {
@@ -345,87 +342,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setIsAuthenticating(false);
       setAuthStepMessage('');
     }
-  };
-
-  const handleDirectGoogleAuth = async () => {
-    if (isAuthenticating) return;
-    setIsAuthenticating(true);
-    setErrorMsg('');
-    setAuthStepMessage('Connecting to Google OAuth 2.0...');
-
-    try {
-      try {
-        const result = await signInWithGoogle();
-        if (result.user && result.user.email) {
-          await executeGoogleAuthWithDetails(
-            result.user.email,
-            result.user.displayName || result.user.email.split('@')[0]
-          );
-          return;
-        }
-      } catch (popupErr: any) {
-        console.warn('Google Popup process notice:', popupErr);
-        const errCode = popupErr?.code || '';
-        const errStr = String(popupErr?.message || popupErr || '');
-
-        if (errCode === 'auth/popup-closed-by-user' || errStr.includes('popup-closed-by-user')) {
-          setErrorMsg('Google Sign-In popup was closed before completing sign-in.');
-          setIsAuthenticating(false);
-          setAuthStepMessage('');
-          return;
-        }
-
-        if (errCode === 'auth/cancelled-popup-request' || errStr.includes('cancelled-popup-request')) {
-          setIsAuthenticating(false);
-          setAuthStepMessage('');
-          return;
-        }
-
-        // If popup was blocked or failed in sandbox/iframe environments, open the Google Account Chooser screen!
-        setIsAuthenticating(false);
-        setAuthStepMessage('');
-        setShowGoogleAccountPicker(true);
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to authenticate via Google');
-      setIsAuthenticating(false);
-      setAuthStepMessage('');
-    }
-  };
-
-  const isGibberishUsername = (username: string): boolean => {
-    const cleanUser = username.toLowerCase().replace(/[^a-z]/g, '');
-    if (!cleanUser) return false;
-    
-    if (cleanUser.length < 3) return true;
-
-    // Keyboard mashing patterns
-    const mashingPatterns = [
-      'qwerty', 'qwert', 'werty', 'ertyu', 'rtyui', 'tyuio', 'yuiop',
-      'asdfg', 'sdfgh', 'dfghj', 'fghjk', 'ghjkl',
-      'zxcvb', 'xcvbn', 'cvbnm',
-      '12345', '23456', '34567', '45678', '56789',
-      'wdwr', 'fghj', 'hjkl', 'asdf', 'zxcv', 'qwer'
-    ];
-    for (const pat of mashingPatterns) {
-      if (cleanUser.includes(pat)) return true;
-    }
-
-    // Triple repeating characters
-    if (/(.)\1\1/.test(cleanUser)) return true;
-
-    // 4 or more consecutive consonants (without vowels a,e,i,o,u,y)
-    if (/[bcdfghjklmnpqrstvwxz]{4,}/i.test(cleanUser)) return true;
-
-    // Low vowel ratio for strings >= 6 chars
-    if (cleanUser.length >= 6) {
-      const vowels = cleanUser.match(/[aeiouy]/gi);
-      const vowelCount = vowels ? vowels.length : 0;
-      const vowelRatio = vowelCount / cleanUser.length;
-      if (vowelRatio < 0.18) return true;
-    }
-
-    return false;
   };
 
   const validateEmailClient = (emailStr: string): { valid: boolean; message: string } => {
@@ -531,7 +447,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-black/85 backdrop-blur-xl p-2 sm:p-4 w-full max-w-full">
-        {/* Animated backdrop mask */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -540,9 +455,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           className="fixed inset-0 bg-gradient-to-b from-cyan-950/20 via-black/90 to-black/95"
         />
 
-        {/* Flex Centering Wrapper */}
         <div className="flex min-h-full items-center justify-center text-center p-0 sm:p-2">
-          {/* Modal Container */}
           <motion.div
             initial={{ opacity: 0, scale: 0.94, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -550,15 +463,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             transition={{ type: "spring", damping: 26, stiffness: 320 }}
             className="relative w-full max-w-lg bg-gradient-to-b from-[#0D1527] via-[#070C18] to-[#040710] border border-cyan-500/40 rounded-2xl sm:rounded-3xl shadow-[0_0_80px_rgba(6,182,212,0.3)] ring-1 ring-cyan-500/30 overflow-hidden font-sans z-10 my-auto p-4 sm:p-8 max-h-[90vh] overflow-y-auto text-white text-left"
           >
-          {/* Top Neon Gradient Accent Bar */}
           <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-cyan-400 via-teal-300 via-emerald-400 to-amber-400 animate-pulse" />
 
-          {/* Ambient Lighting Background Glows */}
-          <div className="absolute -top-24 -right-24 w-80 h-80 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-
-          {/* Top Header Bar */}
           <div className="relative flex items-center justify-center pb-4 border-b border-slate-800/80 mb-4 z-10">
             <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-wider font-mono text-center">
               {isLoginView ? 'LOG IN TO ACCOUNT' : 'CREATE FREE ACCOUNT'}
@@ -572,7 +478,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
           </div>
 
-          {/* Mode Header Badge / Interactive Switcher */}
           <div className="flex bg-[#030814] p-1.5 rounded-2xl border border-cyan-500/30 mb-5 relative z-10 font-mono text-xs gap-1.5">
             <button
               type="button"
@@ -600,22 +505,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
           </div>
 
-          {/* Success Message */}
-          <AnimatePresence>
-            {successMsg && (
-              <motion.div
-                initial={{ opacity: 0, height: 0, y: -10 }}
-                animate={{ opacity: 1, height: 'auto', y: 0 }}
-                exit={{ opacity: 0, height: 0, y: -10 }}
-                className="p-3.5 bg-emerald-950/90 border border-emerald-400/80 rounded-2xl text-emerald-200 text-xs font-mono flex items-center gap-2.5 mb-5 shadow-lg shadow-emerald-950/60 relative z-10"
-              >
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                <span>{successMsg}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Error Message */}
           <AnimatePresence>
             {errorMsg && (
               <motion.div
@@ -630,249 +519,76 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             )}
           </AnimatePresence>
 
-          {/* Already Registered Account Notice with Login Button */}
-          <AnimatePresence>
-            {alreadyRegisteredNotice && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                className="p-4 bg-gradient-to-r from-amber-950/90 via-[#190F05] to-yellow-950/90 border-2 border-amber-400/90 rounded-2xl space-y-3 mb-5 shadow-2xl shadow-amber-950/80 relative z-20 text-left"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0 mt-0.5 shadow-sm shadow-amber-500/30">
-                    <AlertTriangle className="w-5 h-5 text-amber-400" />
-                  </div>
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                      Account Already Registered
-                    </h4>
-                    <p className="text-xs font-bold text-slate-100 leading-snug font-sans">
-                      This account (<span className="text-amber-300 font-bold font-mono">{alreadyRegisteredNotice.email}</span>) is already registered. Please log in to access your portfolio.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onLoginSuccess(alreadyRegisteredNotice.user);
-                      setAlreadyRegisteredNotice(null);
-                      setShowGoogleOnboarding(false);
-                      onClose();
-                    }}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2.5 shadow-lg shadow-amber-500/30 transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.98]"
-                  >
-                    <LogIn className="w-4 h-4 stroke-[2.5] text-slate-950" />
-                    <span className="tracking-wide">LOG IN TO YOUR ACCOUNT NOW</span>
-                    <ArrowRight className="w-4 h-4 text-slate-950" />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Loading Indicator */}
-          <AnimatePresence>
-            {isAuthenticating && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="p-4 bg-gradient-to-r from-cyan-950/90 to-blue-950/90 border border-cyan-400/60 rounded-2xl text-center space-y-2 mb-5 shadow-xl shadow-cyan-950/80 relative z-10"
-              >
-                <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto shadow-sm shadow-cyan-400/50" />
-                <p className="text-xs font-mono font-bold text-cyan-300 tracking-wide">
-                  {authStepMessage || 'Authenticating...'}
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* STEP CONTENT */}
-          {showGoogleAccountPicker ? (
-            /* GOOGLE ACCOUNT SELECTOR SCREEN */
-            <div className="space-y-5 relative z-10 text-left">
-              <div className="p-5 rounded-2xl bg-gradient-to-r from-[#0C1527] via-[#08101E] to-[#040A14] border border-cyan-500/50 shadow-xl space-y-3 relative overflow-hidden">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-white p-2 flex items-center justify-center shrink-0 shadow-md">
-                    <GoogleIcon />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-white uppercase tracking-tight flex items-center gap-2 font-mono">
-                      Choose a Google Account
-                    </h3>
-                    <p className="text-xs text-slate-300 font-sans">
-                      Select an account to continue to <strong className="text-cyan-300 font-mono">Dollar Craft Vault</strong>
-                    </p>
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-400 font-mono leading-relaxed border-t border-slate-800/80 pt-2.5">
-                  Select or enter the Google email address you want to use to {isLoginView ? 'log in' : 'sign up'}.
-                </p>
-              </div>
-
-              {/* Account Selection Options */}
-              <div className="space-y-3.5">
-                <div>
-                  <label className="text-[11px] font-mono font-bold text-cyan-300 uppercase tracking-wider block mb-1.5">
-                    Enter Your Google Email Address *
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-cyan-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="your.google.account@gmail.com"
-                      value={googlePickerEmail}
-                      onChange={(e) => setGooglePickerEmail(e.target.value)}
-                      className="w-full bg-[#030914] border border-cyan-500/50 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-400/30 text-white rounded-xl pl-10 pr-4 py-3 text-xs outline-none font-mono font-bold shadow-inner transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-mono font-bold text-cyan-300 uppercase tracking-wider block mb-1.5">
-                    Full Name (Optional)
-                  </label>
-                  <div className="relative">
-                    <UserIcon className="w-4 h-4 text-cyan-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type="text"
-                      placeholder="e.g. John Doe"
-                      value={googlePickerName}
-                      onChange={(e) => setGooglePickerName(e.target.value)}
-                      className="w-full bg-[#030914] border border-cyan-500/50 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-400/30 text-white rounded-xl pl-10 pr-4 py-3 text-xs outline-none font-mono font-medium shadow-inner transition-all"
-                    />
-                  </div>
+          <form onSubmit={isLoginView ? handleLoginSubmit : handleRegistrationSubmit} className="space-y-4 relative z-10">
+            {!isLoginView && (
+              <div>
+                <label className="text-[11px] font-mono font-bold text-cyan-300 uppercase tracking-wider block mb-1">
+                  Full Name *
+                </label>
+                <div className="relative">
+                  <UserIcon className="w-4 h-4 text-cyan-400 absolute left-3.5 top-3.5" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. John Doe"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-[#030814] border border-cyan-500/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-400/30 text-white rounded-xl pl-10 pr-4 py-2.5 text-xs outline-none font-sans font-medium transition-all shadow-inner placeholder:text-slate-500"
+                  />
                 </div>
               </div>
+            )}
 
-              <div className="pt-2 space-y-2.5">
+            <div>
+              <label className="text-[11px] font-mono font-bold text-cyan-300 uppercase tracking-wider block mb-1">
+                Email Address *
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-cyan-400 absolute left-3.5 top-3.5" />
+                <input
+                  type="email"
+                  required
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-[#030814] border border-cyan-500/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-400/30 text-white rounded-xl pl-10 pr-4 py-2.5 text-xs outline-none font-mono font-medium transition-all shadow-inner placeholder:text-slate-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-mono font-bold text-cyan-300 uppercase tracking-wider block mb-1">
+                Password *
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-cyan-400 absolute left-3.5 top-3.5" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-[#030814] border border-cyan-500/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-400/30 text-white rounded-xl pl-10 pr-10 py-2.5 text-xs outline-none font-mono font-medium transition-all shadow-inner placeholder:text-slate-500"
+                />
                 <button
                   type="button"
-                  disabled={!googlePickerEmail || !googlePickerEmail.includes('@')}
-                  onClick={() => executeGoogleAuthWithDetails(googlePickerEmail, googlePickerName)}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 hover:brightness-110 disabled:opacity-40 text-slate-950 font-black rounded-xl text-xs font-mono flex items-center justify-center gap-2.5 shadow-lg shadow-cyan-500/30 transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.98]"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-3 text-slate-400 hover:text-white cursor-pointer"
                 >
-                  <GoogleIcon />
-                  <span className="tracking-wide uppercase">
-                    Continue with Google Account
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-slate-950" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowGoogleAccountPicker(false)}
-                  className="w-full py-2.5 px-4 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white font-mono text-xs font-bold rounded-xl transition-all cursor-pointer border border-slate-800"
-                >
-                  Cancel / Go Back
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
-          ) : (
-            /* AUTHENTICATION PORTAL CONTENT */
-            <div className="space-y-5 relative z-10 text-left">
-              {/* Form Fields */}
-              <form onSubmit={isLoginView ? handleLoginSubmit : handleRegistrationSubmit} className="space-y-4">
-                {!isLoginView && (
-                  <div>
-                    <label className="text-[11px] font-mono font-bold text-cyan-300 uppercase tracking-wider block mb-1">
-                      Full Name *
-                    </label>
-                    <div className="relative">
-                      <UserIcon className="w-4 h-4 text-cyan-400 absolute left-3.5 top-3.5" />
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. John Doe"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-[#030814] border border-cyan-500/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-400/30 text-white rounded-xl pl-10 pr-4 py-2.5 text-xs outline-none font-sans font-medium transition-all shadow-inner placeholder:text-slate-500"
-                      />
-                    </div>
-                  </div>
-                )}
 
-                <div>
-                  <label className="text-[11px] font-mono font-bold text-cyan-300 uppercase tracking-wider block mb-1">
-                    Email Address *
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-cyan-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="name@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-[#030814] border border-cyan-500/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-400/30 text-white rounded-xl pl-10 pr-4 py-2.5 text-xs outline-none font-mono font-medium transition-all shadow-inner placeholder:text-slate-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-mono font-bold text-cyan-300 uppercase tracking-wider block mb-1">
-                    Password *
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-cyan-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-[#030814] border border-cyan-500/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-400/30 text-white rounded-xl pl-10 pr-10 py-2.5 text-xs outline-none font-mono font-medium transition-all shadow-inner placeholder:text-slate-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-3 text-slate-400 hover:text-white cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {!isLoginView && (
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[11px] font-mono font-bold text-cyan-300 uppercase tracking-wider block">
-                        Referral Code (Optional)
-                      </label>
-                      <span className="text-[10px] text-amber-400 font-mono font-bold flex items-center gap-1">
-                        🎁 5% Referrer Bonus
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <Gift className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
-                      <input
-                        type="text"
-                        placeholder="e.g. DC9A2B4X or referrer username"
-                        value={signupReferralCode}
-                        onChange={(e) => setSignupReferralCode(e.target.value)}
-                        className="w-full bg-[#030814] border border-amber-500/50 focus:border-amber-300 focus:ring-2 focus:ring-amber-400/30 text-amber-200 rounded-xl pl-10 pr-4 py-2.5 text-xs outline-none font-mono font-bold transition-all shadow-inner placeholder:text-slate-500 uppercase"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Submit Action Button */}
-                <button
-                  type="submit"
-                  disabled={isAuthenticating}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 hover:brightness-125 text-slate-950 font-black rounded-xl text-xs sm:text-sm font-mono flex items-center justify-center gap-2 shadow-xl shadow-cyan-500/30 ring-1 ring-white/40 transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 mt-3"
-                >
-                  <span>{isLoginView ? 'LOG IN' : 'CREATE FREE ACCOUNT NOW'}</span>
-                  <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-                </button>
-              </form>
-
-            </div>
-          )}
+            <button
+              type="submit"
+              disabled={isAuthenticating}
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 hover:brightness-125 text-slate-950 font-black rounded-xl text-xs sm:text-sm font-mono flex items-center justify-center gap-2 shadow-xl shadow-cyan-500/30 transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 mt-3"
+            >
+              <span>{isLoginView ? 'LOG IN' : 'CREATE FREE ACCOUNT NOW'}</span>
+              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+            </button>
+          </form>
 
           <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 pt-5 border-t border-slate-800/80 mt-5 font-mono relative z-10">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
