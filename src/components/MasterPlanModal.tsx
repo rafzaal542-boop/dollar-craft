@@ -59,49 +59,7 @@ export const MasterPlanModal: React.FC<MasterPlanModalProps> = ({
         {/* Content Body - Investment Plans Grid */}
         <div className="relative z-10 p-5 sm:p-6 overflow-y-auto space-y-6">
 
-          {/* Admin Internal Transfer / User Transferred Dollar Balance Card */}
-          <div className="bg-gradient-to-r from-[#07192C] via-[#08202A] to-[#0D1829] border border-emerald-400/50 rounded-2xl p-4 sm:p-5 shadow-2xl shadow-emerald-950/40 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="absolute -top-10 -right-10 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-            
-            <div className="flex items-center gap-3.5 relative z-10">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-teal-500/20 to-cyan-500/20 border border-emerald-400/60 flex items-center justify-center shrink-0 text-emerald-300 shadow-lg shadow-emerald-500/20">
-                <Wallet className="w-6 h-6 text-emerald-400 animate-pulse" />
-              </div>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-mono font-black uppercase tracking-wider px-2.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center gap-1 shadow-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
-                    Internal Transfer Funds
-                  </span>
-                  {currentUser?.email && (
-                    <span className="text-xs font-mono text-cyan-300/90 font-bold bg-slate-900/80 px-2.5 py-0.5 rounded border border-slate-800">
-                      {currentUser.email}
-                    </span>
-                  )}
-                </div>
-                <h4 className="text-xs sm:text-sm font-bold text-slate-200">
-                  Admin Internal Transfer Dollar Balance:
-                </h4>
-                <p className="text-[11px] text-slate-400 font-sans">
-                  Dollars transferred directly by Admin to your email account are ready for instant plan activation.
-                </p>
-              </div>
-            </div>
 
-            <div className="relative z-10 flex items-center gap-3 bg-[#050D1A]/90 p-3.5 rounded-xl border border-emerald-500/40 shrink-0 w-full md:w-auto justify-between md:justify-end shadow-inner">
-              <div className="text-left md:text-right">
-                <span className="text-[10px] text-emerald-400 font-mono font-extrabold uppercase tracking-widest block">
-                  Available Balance
-                </span>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight">
-                    ${totalUserDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                  <span className="text-xs text-emerald-400 font-black font-mono">USD</span>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.map((plan) => {

@@ -42,7 +42,7 @@ export const AboutUsView: React.FC<AboutUsViewProps> = ({
     {
       icon: Building2,
       title: 'Institutional IB Partner Program',
-      desc: 'Dedicated $7,000 USDT IB Membership tier granting 20% direct referral commissions and full principal deployment.',
+      desc: 'Dedicated $7,000 USDT IB Membership tier granting 10% direct referral commissions and full principal deployment.',
       color: 'from-indigo-500/20 to-purple-500/10 border-indigo-500/30 text-indigo-400'
     }
   ];
@@ -96,7 +96,7 @@ export const AboutUsView: React.FC<AboutUsViewProps> = ({
             </div>
             <div>
               <div className="text-xs font-mono text-slate-400 uppercase font-bold">IB Referral Reward</div>
-              <div className="text-xl sm:text-2xl font-black font-mono text-indigo-400">20% Direct</div>
+              <div className="text-xl sm:text-2xl font-black font-mono text-indigo-400">10% Direct</div>
             </div>
           </div>
 

@@ -24,7 +24,7 @@ export const ServicesModal: React.FC<ServicesModalProps> = ({
     {
       icon: <Building2 className="w-6 h-6 text-amber-400" />,
       title: "IB Partner Institutional Network",
-      desc: "Instant 20% direct referral commission rewards on client memberships with transparent ledger tracking and instant wallet withdrawals."
+      desc: "Instant 10% direct referral commission rewards on client memberships with transparent ledger tracking and instant wallet withdrawals."
     },
     {
       icon: <ArrowRightLeft className="w-6 h-6 text-emerald-400" />,

@@ -58,15 +58,12 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between border-t border-slate-800/80 pt-3 gap-3">
                 <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <MessageCircle className="w-5 h-5 text-emerald-400 shrink-0" />
                   <div>
-                    <h4 className="text-xs font-mono font-bold text-slate-400 uppercase">Global Hotline</h4>
-                    <a
-                      href="tel:+923711386489"
-                      className="text-sm text-emerald-300 hover:text-emerald-200 font-mono font-bold mt-0.5 block hover:underline transition-colors"
-                    >
-                      +923711386489
-                    </a>
+                    <h4 className="text-xs font-mono font-bold text-slate-400 uppercase">Live Support Channel</h4>
+                    <span className="text-sm text-emerald-300 font-mono font-bold mt-0.5 block">
+                      24/7 WhatsApp Desk
+                    </span>
                   </div>
                 </div>
 
@@ -81,7 +78,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   </div>
 
                   <a
-                    href="https://wa.me/923711386489"
+                    href="/api/whatsapp-support"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black rounded-xl text-xs font-mono flex items-center gap-1.5 shadow-md shadow-emerald-500/25 transition-all cursor-pointer hover:scale-[1.03] active:scale-[0.98]"

@@ -90,11 +90,14 @@ export const LiveEarningsModal: React.FC<LiveEarningsModalProps> = ({
   // Calculate total dollars received strictly from internal transfers
   const totalTransfersReceived = transfers.reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
 
-  // Tier calculation: DC1 ($100 - $500 -> 25% monthly), DC2 ($501+ -> 30% monthly)
+  // Tier calculation: DC1 ($100 - $500 -> 25% monthly), DC2 ($501 - $1000 -> 30% monthly), DC3 ($1001+ -> 35% monthly)
   let monthlyRate = 0.25;
   let tierBadge = 'DC1 (25% Monthly Return)';
 
-  if (totalTransfersReceived > 500) {
+  if (totalTransfersReceived >= 1001) {
+    monthlyRate = 0.35;
+    tierBadge = 'DC3 (35% Monthly Return)';
+  } else if (totalTransfersReceived > 500) {
     monthlyRate = 0.30;
     tierBadge = 'DC2 (30% Monthly Return)';
   } else if (totalTransfersReceived >= 100) {

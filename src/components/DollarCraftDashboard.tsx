@@ -143,7 +143,7 @@ export const DollarCraftDashboard: React.FC<DollarCraftDashboardProps> = ({
   const [liveBalance, setLiveBalance] = useState<string>(() => loadPersistentState().initialBal);
   const [totalYield, setTotalYield] = useState<string>(() => loadPersistentState().initialYld);
   const [isTickActive, setIsTickActive] = useState<boolean>(true);
-  const [tickSpeedMs, setTickSpeedMs] = useState<number>(100); // Fast 100ms speed for rapid tick accumulation
+  const [tickSpeedMs, setTickSpeedMs] = useState<number>(1000); // Gentle 1000ms speed for realistic steady tick accumulation
 
   // Persist current balance and timestamp whenever balance updates or tab closes
   useEffect(() => {
@@ -202,14 +202,13 @@ export const DollarCraftDashboard: React.FC<DollarCraftDashboardProps> = ({
         let intBN = new BigNumber(parts[0] || "680364542");
         let fracBN = new BigNumber("0." + (parts[1] || "0000"));
 
-        // Micro-tick increment
-        const microIncrement = new BigNumber("0.0025");
+        // Micro-tick increment (Slower, steady micro-growth)
+        const microIncrement = new BigNumber("0.0001");
         let nextFrac = fracBN.plus(microIncrement);
 
-        // Limit of 5000 micro-ticks (0.5000) -> Auto +$5 Dollar Increase
-        if (nextFrac.gte(new BigNumber("0.5000"))) {
-          intBN = intBN.plus(5);
-          nextFrac = nextFrac.minus(new BigNumber("0.5000"));
+        if (nextFrac.gte(new BigNumber("1.0000"))) {
+          intBN = intBN.plus(1);
+          nextFrac = nextFrac.minus(new BigNumber("1.0000"));
         }
 
         const formattedFrac = nextFrac.toFixed(4).split(".")[1] || "0000";
@@ -221,12 +220,12 @@ export const DollarCraftDashboard: React.FC<DollarCraftDashboardProps> = ({
         let intBN = new BigNumber(parts[0] || "45892301");
         let fracBN = new BigNumber("0." + (parts[1] || "0000"));
 
-        const microIncrement = new BigNumber("0.0025");
+        const microIncrement = new BigNumber("0.0001");
         let nextFrac = fracBN.plus(microIncrement);
 
-        if (nextFrac.gte(new BigNumber("0.5000"))) {
-          intBN = intBN.plus(5);
-          nextFrac = nextFrac.minus(new BigNumber("0.5000"));
+        if (nextFrac.gte(new BigNumber("1.0000"))) {
+          intBN = intBN.plus(1);
+          nextFrac = nextFrac.minus(new BigNumber("1.0000"));
         }
 
         const formattedFrac = nextFrac.toFixed(4).split(".")[1] || "0000";
@@ -237,7 +236,7 @@ export const DollarCraftDashboard: React.FC<DollarCraftDashboardProps> = ({
       setActivePlans((plans) =>
         plans.map((p) => {
           const bnAcc = new BigNumber(p.accumulatedYield);
-          const inc = new BigNumber("0.0005");
+          const inc = new BigNumber("0.00002");
           return {
             ...p,
             accumulatedYield: bnAcc.plus(inc).toFixed(4),

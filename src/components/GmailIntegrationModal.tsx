@@ -151,8 +151,8 @@ export const authOptions = {
   ],
   callbacks: {
     async session({ session, user }: any) {
-      if (session.user) {
-        session.user.id = user.id;
+      if (session?.user) {
+        session.user.id = user?.id || session.user.id;
       }
       return session;
     },

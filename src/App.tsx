@@ -43,6 +43,9 @@ import {
   Info
 } from 'lucide-react';
 
+// Central API Base URL Configuration for Production Backend
+const API_BASE_URL = 'https://dollar-craft-cl1t803tw-dollar-craft.vercel.app';
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [deposits, setDeposits] = useState<UserDeposit[]>([]);
@@ -117,7 +120,7 @@ export default function App() {
       setActiveTab('pro_dashboard');
 
       try {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST' });
         const { logoutFirebase } = await import('./lib/firebase');
         await logoutFirebase();
       } catch (e) {
@@ -167,7 +170,7 @@ export default function App() {
       if (savedUserEmail) q.set('userEmail', savedUserEmail);
       if (savedUserId) q.set('userId', savedUserId);
 
-      const res = await fetch(`/api/dashboard/state?${q.toString()}`, { headers });
+      const res = await fetch(`${API_BASE_URL}/api/dashboard/state?${q.toString()}`, { headers });
       if (res.ok) {
         const data = await res.json();
         if (!isLogout && data.user) {
@@ -194,7 +197,7 @@ export default function App() {
         setMetrics(data.metrics || null);
       }
 
-      const usersRes = await fetch('/api/admin/users');
+      const usersRes = await fetch(`${API_BASE_URL}/api/admin/users`);
       if (usersRes.ok) {
         const usersData = await usersRes.json();
         setAllUsers(usersData.users || []);
@@ -231,7 +234,7 @@ export default function App() {
     if (savedEmail) q.set('userEmail', savedEmail.trim().toLowerCase());
     if (savedId) q.set('userId', savedId);
 
-    const eventSource = new EventSource(`/api/yield/stream?${q.toString()}`);
+    const eventSource = new EventSource(`${API_BASE_URL}/api/yield/stream?${q.toString()}`);
 
     eventSource.onmessage = (event) => {
       try {
@@ -252,10 +255,18 @@ export default function App() {
             return prev;
           }
 
+          const prevBalBN = new BigNumber(prev.principalBalance || '0');
+          const incomingBalBN = new BigNumber(data.principalBalance !== undefined ? data.principalBalance : '0');
+          const finalBalBN = BigNumber.max(prevBalBN, incomingBalBN);
+
+          const prevYieldBN = new BigNumber(prev.earnedYield || '0');
+          const incomingYieldBN = new BigNumber(data.earnedYield !== undefined ? data.earnedYield : '0');
+          const finalYieldBN = BigNumber.max(prevYieldBN, incomingYieldBN);
+
           return {
             ...prev,
-            principalBalance: data.principalBalance || prev.principalBalance,
-            earnedYield: data.earnedYield || prev.earnedYield
+            principalBalance: finalBalBN.toFixed(18),
+            earnedYield: finalYieldBN.toFixed(18)
           };
         });
 
@@ -267,7 +278,8 @@ export default function App() {
         if (data.activeCycles && Array.isArray(data.activeCycles)) {
           setDeposits((prevDeposits) =>
             prevDeposits.map((dep) => {
-              const match = data.activeCycles.find((c: any) => c.id === dep.id);
+              if (!dep) return dep;
+              const match = data.activeCycles.find((c: any) => c && c.id === dep.id);
               if (match) {
                 return {
                   ...dep,
@@ -319,7 +331,7 @@ export default function App() {
         console.warn('Firestore duplicate pre-check notice:', checkErr);
       }
 
-      const res = await fetch('/api/deposit/create', {
+      const res = await fetch(`${API_BASE_URL}/api/deposit/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planId, amount, network, txHash })
@@ -339,7 +351,7 @@ export default function App() {
             userEmail: auth.currentUser.email || user?.email || '',
             amount,
             transactionId: txHash.trim(),
-            bankName: 'Dubai Islamic Bank',
+            bankName: 'Mashreq Bank',
             planId,
             status: 'pending',
             createdAt: new Date().toISOString()
@@ -364,24 +376,42 @@ export default function App() {
 
   const handleSubmitWithdrawal = async (amount: number, destinationAddr: string, network: string) => {
     try {
-      const res = await fetch('/api/withdrawal/request', {
+      const res = await fetch(`${API_BASE_URL}/api/withdrawal/request`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, destinationAddr, network })
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || ''
+        },
+        body: JSON.stringify({ 
+          amount, 
+          destinationAddr, 
+          network,
+          userId: user?.id,
+          userEmail: user?.email
+        })
       });
-      const data = await res.json();
-      if (data.success) {
+
+      let data: any = {};
+      try {
+        const text = await res.text();
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        console.warn('Non-JSON response from withdrawal API:', parseErr);
+        return { success: false, message: 'Server returned unexpected format. Please try again.' };
+      }
+
+      if (res.ok && data.success) {
         await fetchState();
         return { success: true, message: data.message };
       }
-      return { success: false, message: data.message || 'Withdrawal failed' };
+      return { success: false, message: data.message || 'Withdrawal request failed.' };
     } catch (err: any) {
-      return { success: false, message: err.message || 'Server error' };
+      return { success: false, message: err.message || 'Network error processing withdrawal.' };
     }
   };
 
   const handleApproveWithdrawal = async (txId: string) => {
-    await fetch('/api/admin/withdrawal/approve', {
+    await fetch(`${API_BASE_URL}/api/admin/withdrawal/approve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ txId })
@@ -390,7 +420,7 @@ export default function App() {
   };
 
   const handleRejectWithdrawal = async (txId: string, reason: string) => {
-    await fetch('/api/admin/withdrawal/reject', {
+    await fetch(`${API_BASE_URL}/api/admin/withdrawal/reject`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ txId, reason })
@@ -399,7 +429,7 @@ export default function App() {
   };
 
   const handleFreezeUser = async (userId: string, reason: string) => {
-    await fetch('/api/admin/user/freeze', {
+    await fetch(`${API_BASE_URL}/api/admin/user/freeze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, reason })
@@ -408,7 +438,7 @@ export default function App() {
   };
 
   const handleUnfreezeUser = async (userId: string) => {
-    await fetch('/api/admin/user/unfreeze', {
+    await fetch(`${API_BASE_URL}/api/admin/user/unfreeze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId })
@@ -443,7 +473,13 @@ export default function App() {
         user={user}
         onOpenDeposit={() => setIsDepositOpen(true)}
         onOpenWithdrawal={() => setIsWithdrawalOpen(true)}
-        onOpenAdmin={() => setIsAdminOpen(true)}
+        onOpenAdmin={() => {
+          if (user?.email?.toLowerCase() === 'dollarcraft3@gmail.com' || user?.role === 'ADMIN') {
+            setIsAdminOpen(true);
+          } else {
+            alert('Access Denied: Only the authorized sovereign admin account (dollarcraft3@gmail.com) can access the Admin Control Panel.');
+          }
+        }}
         onOpenMasterPlan={() => setIsMasterPlanOpen(true)}
         onOpenAuth={handleOpenAuth}
         onOpenGmailModal={() => setIsGmailModalOpen(true)}
@@ -496,6 +532,7 @@ export default function App() {
             onOpenWithdraw={() => setIsWithdrawalOpen(true)}
             onOpenMasterPlan={() => setIsMasterPlanOpen(true)}
             onOpenAuth={handleOpenAuth}
+            onRefreshData={fetchState}
           />
         )}
 
@@ -610,8 +647,6 @@ export default function App() {
       <footer className="mt-16 bg-[#05070B] border-t border-slate-800/90 text-slate-400 font-sans py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto space-y-10">
           
-
-
           {/* Bottom Copyright & Disclaimer */}
           <div className="pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500">
             <p>© 2018 Dollar Craft. All Rights Reserved.</p>
@@ -653,12 +688,12 @@ export default function App() {
       <WithdrawalModal
         isOpen={isWithdrawalOpen}
         onClose={() => setIsWithdrawalOpen(false)}
-        availableBalance={user ? new BigNumber(user.principalBalance || '0').plus(user.earnedYield || '0').toFixed(18) : '0'}
+        availableBalance={user ? user.earnedYield || '0' : '0'}
         earnedYield={user?.earnedYield || '0'}
         onSubmitWithdrawal={handleSubmitWithdrawal}
       />
 
-      {metrics && (
+      {metrics && (user?.email?.toLowerCase() === 'dollarcraft3@gmail.com' || user?.role === 'ADMIN') && (
         <AdminPanel
           isOpen={isAdminOpen}
           onClose={() => setIsAdminOpen(false)}

@@ -96,9 +96,9 @@ export const InternalTransferPanel: React.FC<InternalTransferPanelProps> = ({
   }, [preSelectedUser]);
 
   const filteredUsersForSearch = users.filter(u => 
-    u.role !== 'ADMIN' && (
-      u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.id.toLowerCase().includes(userSearch.toLowerCase()) ||
+    u && u.role !== 'ADMIN' && (
+      (u.email && u.email.toLowerCase().includes(userSearch.toLowerCase())) ||
+      (u.id && u.id.toLowerCase().includes(userSearch.toLowerCase())) ||
       (u.referralCode && u.referralCode.toLowerCase().includes(userSearch.toLowerCase()))
     )
   );
@@ -110,7 +110,7 @@ export const InternalTransferPanel: React.FC<InternalTransferPanelProps> = ({
 
     // Search in users array by email or id
     const matched = users.find(
-      (u) => u.email.toLowerCase() === cleanSearch.toLowerCase() || u.id.toLowerCase() === cleanSearch.toLowerCase()
+      (u) => u && ((u.email && u.email.toLowerCase() === cleanSearch.toLowerCase()) || (u.id && u.id.toLowerCase() === cleanSearch.toLowerCase()))
     );
     if (matched) return matched;
 
@@ -164,8 +164,8 @@ export const InternalTransferPanel: React.FC<InternalTransferPanelProps> = ({
   };
 
   const handleExecuteTransfer = async () => {
-    if (!adminPassword || adminPassword.trim().length === 0) {
-      setPasswordError('Please enter Admin Password to authorize this transaction.');
+    if (!adminPassword || adminPassword.trim() !== 'gdbcbfjnxh@craft@007') {
+      setPasswordError('Invalid Admin Password. Authorization denied.');
       return;
     }
 
@@ -723,7 +723,7 @@ export const InternalTransferPanel: React.FC<InternalTransferPanelProps> = ({
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2.5 px-3 text-xs font-mono text-white focus:outline-none focus:border-cyan-500"
                 autoFocus
               />
-              <p className="text-[10px] text-slate-500 mt-1">Default demo password: admin or any non-empty input</p>
+              <p className="text-[10px] text-slate-400 mt-1 font-mono">Requires master admin authorization password</p>
             </div>
 
             <div className="flex gap-3 pt-2">

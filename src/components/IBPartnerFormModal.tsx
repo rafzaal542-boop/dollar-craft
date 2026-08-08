@@ -217,7 +217,7 @@ export const IBPartnerFormModal: React.FC<IBPartnerFormModalProps> = ({
               <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center gap-2.5">
                 <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
                 <p className="text-[11px] text-slate-300 font-mono leading-tight">
-                  Direct 20% commission tier setup with instant payouts & global client tracking.
+                  Direct 10% commission tier setup with instant payouts & global client tracking.
                 </p>
               </div>
 

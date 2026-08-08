@@ -106,7 +106,7 @@ export const IBApplicationModal: React.FC<IBApplicationModalProps> = ({
                     Join IB Program - Unlock $7,000
                   </h3>
                   <span className="px-2 py-0.5 text-[10px] font-bold font-mono bg-cyan-500/10 text-cyan-400 rounded-full border border-cyan-500/30">
-                    20% DIRECT
+                    10% DIRECT
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
@@ -277,7 +277,7 @@ export const IBApplicationModal: React.FC<IBApplicationModalProps> = ({
               <div className="p-3 rounded-2xl bg-cyan-950/30 border border-cyan-500/20 flex items-center gap-3">
                 <ShieldCheck className="w-5 h-5 text-cyan-400 shrink-0" />
                 <p className="text-[11px] text-cyan-300 font-mono leading-relaxed">
-                  20% instant credit on client deposits up to $7,000 maximum reward cap per IB. Withdraw directly to your USDT wallet anytime.
+                  10% instant credit on client deposits up to $7,000 maximum reward cap per IB. Withdraw directly to your USDT wallet anytime.
                 </p>
               </div>
 

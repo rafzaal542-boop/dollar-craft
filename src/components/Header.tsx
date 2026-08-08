@@ -221,12 +221,12 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 flex-wrap sm:flex-nowrap py-1 relative z-30">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 py-1 relative z-30 max-w-[calc(100vw-135px)] md:max-w-none overflow-x-auto md:overflow-visible no-scrollbar scrollbar-none touch-pan-x min-w-0">
 
             {/* Investment Plans Mobile/Quick Button */}
             <button
               onClick={onOpenMasterPlan}
-              className="md:hidden h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:text-amber-100 font-mono font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-950/40 shrink-0"
+              className="md:hidden h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:text-amber-100 font-mono font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-950/40 shrink-0 whitespace-nowrap"
               title="Open Investment Plans"
             >
               <TrendingUp className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -239,17 +239,17 @@ export const Header: React.FC<HeaderProps> = ({
                 <>
                   <button
                     onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                    className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-[#0B132B] hover:bg-[#121E42] border border-cyan-500/40 hover:border-cyan-300 text-cyan-400 hover:text-cyan-300 flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-cyan-950/50 relative group shrink-0"
+                    className="h-9 sm:h-10 px-2.5 sm:px-3.5 rounded-xl bg-[#0B132B] hover:bg-[#121E42] border border-cyan-500/40 hover:border-cyan-300 text-cyan-400 hover:text-cyan-300 flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-cyan-950/50 relative group shrink-0"
                     title="Click to view Account Details and Log Out option"
                   >
                     <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-gradient-to-br from-cyan-500/30 to-blue-600/30 border border-cyan-400/50 flex items-center justify-center text-cyan-300 shrink-0">
                       <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-300 group-hover:scale-110 transition-transform" />
                     </div>
-                    <div className="flex flex-col text-left leading-tight max-w-[90px] xs:max-w-[120px] sm:max-w-[160px] truncate">
+                    <div className="flex flex-col text-left leading-tight max-w-[100px] xs:max-w-[140px] sm:max-w-[180px] truncate">
                       <span className="text-[11px] sm:text-xs font-black text-white truncate">
                         {user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.username || user.email.split('@')[0]}
                       </span>
-                      <span className="text-[9px] sm:text-[10px] text-cyan-300/80 truncate font-mono">
+                      <span className="text-[9px] sm:text-[10.5px] text-cyan-300/80 truncate font-mono">
                         {user.email}
                       </span>
                     </div>
@@ -260,7 +260,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {/* Quick Direct Logout Button */}
                   <button
                     onClick={() => setShowLogoutConfirm(true)}
-                    className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 hover:text-rose-100 font-mono font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-rose-950/50 shrink-0"
+                    className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 hover:text-rose-100 font-mono font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-rose-950/50 shrink-0 whitespace-nowrap"
                     title="Log Out of Account"
                   >
                     <LogOut className="w-3.5 h-3.5 text-rose-400 shrink-0" />
@@ -280,7 +280,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Account Popover Modal */}
               {showProfileDropdown && (
-                <div className="absolute right-0 mt-3 w-80 sm:w-84 bg-[#0A1020] border border-cyan-500/30 rounded-3xl shadow-[0_0_60px_rgba(6,182,212,0.3)] p-5 z-50 text-white font-sans animate-in fade-in zoom-in-95 duration-200">
+                <div className="fixed inset-x-3 sm:inset-auto sm:right-6 md:right-12 lg:right-24 top-16 mt-2 w-auto sm:w-84 bg-[#0A1020] border border-cyan-500/30 rounded-3xl shadow-[0_0_60px_rgba(6,182,212,0.5)] p-5 z-[100] text-white font-sans animate-in fade-in zoom-in-95 duration-200">
                   {/* Header Row */}
                   <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800/80">
                     <button
@@ -422,14 +422,16 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            <button
-              onClick={onOpenAdmin}
-              className="h-9 sm:h-10 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border border-amber-500/50 text-amber-300 hover:text-white transition-all cursor-pointer shadow-md shadow-amber-500/10 flex items-center gap-1.5 font-bold text-xs sm:text-sm whitespace-nowrap shrink-0"
-              title="Open Admin Control Panel (Website & Client Account Management)"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400 animate-pulse shrink-0" />
-              <span className="tracking-wide whitespace-nowrap">Admin Panel</span>
-            </button>
+            {(user?.email?.toLowerCase() === 'dollarcraft3@gmail.com' || user?.role === 'ADMIN') && (
+              <button
+                onClick={onOpenAdmin}
+                className="h-9 sm:h-10 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border border-amber-500/50 text-amber-300 hover:text-white transition-all cursor-pointer shadow-md shadow-amber-500/10 flex items-center gap-1.5 font-bold text-xs sm:text-sm whitespace-nowrap shrink-0"
+                title="Open Admin Control Panel (Website & Client Account Management)"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400 animate-pulse shrink-0" />
+                <span className="tracking-wide whitespace-nowrap">Admin Panel</span>
+              </button>
+            )}
 
             <button
               onClick={onOpenWithdrawal}
@@ -531,6 +533,15 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <UserIcon className="w-3.5 h-3.5 text-emerald-400" />
               <span>Customer Dashboard</span>
+            </button>
+
+            <button
+              onClick={onOpenMasterPlan}
+              className="px-3 py-1.5 rounded-xl transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40"
+              title="Open Investment Plans"
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
+              <span>Plans</span>
             </button>
 
             <button

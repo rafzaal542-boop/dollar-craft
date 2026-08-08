@@ -19,6 +19,8 @@ import {
   Award
 } from 'lucide-react';
 import { MOCK_DEPOSIT_WALLETS } from '../data/mockData';
+import { MashreqLogo } from './MashreqLogo';
+import { PaypalLogo } from './PaypalLogo';
 
 interface IBMembershipModalProps {
   isOpen: boolean;
@@ -33,7 +35,7 @@ export const IBMembershipModal: React.FC<IBMembershipModalProps> = ({
   currentUser,
   onSubmitted
 }) => {
-  const [paymentMethod, setPaymentMethod] = useState<'USDT_TRC20' | 'USDT_BEP20' | 'BINANCE_PAY' | 'BANK_TRANSFER'>('USDT_TRC20');
+  const [paymentMethod, setPaymentMethod] = useState<'USDT_TRC20' | 'USDT_BEP20' | 'BINANCE_PAY' | 'BANK_TRANSFER' | 'PAYPAL'>('USDT_TRC20');
   const [proofTxHash, setProofTxHash] = useState('');
   const [userWallet, setUserWallet] = useState(currentUser?.walletAddress || '');
   const [copiedAddress, setCopiedAddress] = useState(false);
@@ -71,13 +73,25 @@ export const IBMembershipModal: React.FC<IBMembershipModalProps> = ({
         };
       case 'BANK_TRANSFER':
         return {
-          title: 'Dubai Islamic Bank Direct Transfer',
-          bankName: 'Dubai Islamic Bank',
-          accountTitle: 'Muhammad Nadeem',
-          accountNumber: '0809383001',
-          iban: 'PK71DUIB0000000809383001',
-          address: 'Dubai Islamic Bank | Title: Muhammad Nadeem | Acc #: 0809383001 | IBAN: PK71DUIB0000000809383001',
-          network: 'Dubai Islamic Bank',
+          title: 'Mashreq Bank Direct Transfer',
+          bankName: 'Mashreq Bank',
+          accountTitle: 'IRTAZA COMMUNICATION',
+          accountNumber: 'PK36MSHQ0000089200164395',
+          iban: 'PK36MSHQ0000089200164395',
+          address: 'Mashreq Bank | Title: IRTAZA COMMUNICATION | IBAN: PK36MSHQ0000089200164395',
+          network: 'Mashreq Bank',
+          fee: 'Zero Fee',
+          qr: null
+        };
+      case 'PAYPAL':
+        return {
+          title: 'PayPal Live Gateway',
+          bankName: 'PayPal',
+          accountTitle: 'Dollar Craft Official',
+          accountNumber: 'PayPal Gateway',
+          iban: 'PayPal Gateway',
+          address: 'PayPal Gateway',
+          network: 'PayPal',
           fee: 'Zero Fee',
           qr: null
         };
@@ -95,6 +109,11 @@ export const IBMembershipModal: React.FC<IBMembershipModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (paymentMethod === 'PAYPAL') {
+      setError('System Busy: PayPal payment gateway is currently busy. Please select Bank Transfer or Crypto.');
+      return;
+    }
 
     if (!proofTxHash.trim()) {
       setError('Please enter your Transaction Hash (TxID) or Payment Reference Number.');
@@ -152,7 +171,7 @@ export const IBMembershipModal: React.FC<IBMembershipModalProps> = ({
                     Activate IB Membership - $7,000
                   </h3>
                   <span className="px-2.5 py-0.5 text-[10px] font-mono font-extrabold bg-amber-400 text-slate-950 rounded-full animate-pulse shadow-sm">
-                    20% DIRECT REWARD
+                    10% DIRECT REWARD
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 font-mono mt-0.5">
@@ -190,8 +209,8 @@ export const IBMembershipModal: React.FC<IBMembershipModalProps> = ({
               <span className="text-[10px] font-mono uppercase font-bold text-emerald-400 flex items-center gap-1">
                 <TrendingUp className="w-3.5 h-3.5" /> 3. Direct Commission
               </span>
-              <p className="text-xs font-bold text-white">20% Direct Commission</p>
-              <p className="text-[10px] text-slate-400 leading-tight">Earn 20% instant reward on every direct IB client.</p>
+              <p className="text-xs font-bold text-white">10% Direct Commission</p>
+              <p className="text-[10px] text-slate-400 leading-tight">Earn 10% instant reward on every direct IB client.</p>
             </div>
           </div>
 
@@ -218,7 +237,7 @@ export const IBMembershipModal: React.FC<IBMembershipModalProps> = ({
                 </div>
                 <ul className="text-[11px] text-slate-300 space-y-1 pl-4 list-disc">
                   <li>Request A: Add $7,000 to your Normal Investable Wallet</li>
-                  <li>Request B: Activate IB Membership & Trigger 20% Upline Commission</li>
+                  <li>Request B: Activate IB Membership & Trigger 10% Upline Commission</li>
                 </ul>
               </div>
 
@@ -279,26 +298,73 @@ export const IBMembershipModal: React.FC<IBMembershipModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('BANK_TRANSFER')}
-                    className={`p-2.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer text-center ${
+                    onClick={() => {
+                      setPaymentMethod('BANK_TRANSFER');
+                      setError(null);
+                    }}
+                    className={`p-2.5 rounded-xl border text-xs font-mono font-bold transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 relative overflow-hidden group ${
                       paymentMethod === 'BANK_TRANSFER'
-                        ? 'bg-blue-950 border-blue-500 text-blue-300 shadow-sm shadow-blue-500/20'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                        ? 'bg-gradient-to-br from-[#0B1E38] to-[#040C1A] border-cyan-400 text-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.3)] ring-1 ring-cyan-400/50 scale-[1.02]'
+                        : 'bg-slate-900/90 border-cyan-500/30 text-slate-300 hover:border-cyan-400/60 hover:text-white'
                     }`}
                   >
-                    Bank Transfer
+                    <MashreqLogo className="w-5 h-5 shrink-0" />
+                    <span>Bank IBAN</span>
+                    <span className="relative flex h-1.5 w-1.5 ml-0.5 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMethod('PAYPAL');
+                      setError('System Busy: PayPal payment gateway is currently busy. Please select Bank Transfer or Crypto.');
+                    }}
+                    className={`p-2.5 rounded-xl border text-xs font-mono font-bold transition-all duration-300 cursor-pointer flex items-center justify-center gap-1.5 relative overflow-hidden group ${
+                      paymentMethod === 'PAYPAL'
+                        ? 'bg-gradient-to-br from-[#0B1A3A] to-[#040A1A] border-blue-400 text-blue-200 shadow-[0_0_20px_rgba(59,130,246,0.3)] ring-1 ring-blue-400/50 scale-[1.02]'
+                        : 'bg-slate-900/90 border-blue-500/30 text-slate-300 hover:border-blue-400/60 hover:text-white'
+                    }`}
+                  >
+                    <PaypalLogo className="w-5 h-5 shrink-0" />
+                    <span>PayPal</span>
+                    <span className="relative flex h-1.5 w-1.5 ml-0.5 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"></span>
+                    </span>
                   </button>
                 </div>
               </div>
 
               {/* Step 2: Deposit Address & QR Box */}
-              {paymentMethod === 'BANK_TRANSFER' ? (
+              {paymentMethod === 'PAYPAL' ? (
+                <div className="p-4 rounded-2xl bg-[#070A16] border border-blue-500/50 space-y-3 font-mono">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wide flex items-center gap-1.5">
+                      <PaypalLogo className="w-5 h-5 shrink-0" />
+                      PayPal Live Gateway
+                    </span>
+                    <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-bold animate-pulse">
+                      System Busy
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-amber-500/15 border border-amber-500/40 rounded-xl text-amber-300 text-xs font-medium flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>System Busy: PayPal channel is currently busy. Please select Bank Transfer or USDT.</span>
+                  </div>
+                </div>
+              ) : paymentMethod === 'BANK_TRANSFER' ? (
                 <div className="p-4 rounded-2xl bg-[#070A12] border border-blue-500/40 space-y-3 font-mono">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">Dubai Islamic Bank Transfer Details</span>
+                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wide flex items-center gap-2">
+                      <MashreqLogo className="w-6 h-6 shrink-0" />
+                      <span>Mashreq Bank Transfer Details</span>
+                    </span>
                     <button
                       type="button"
-                      onClick={() => handleCopy("Bank Name: Dubai Islamic Bank\nAccount Title: Muhammad Nadeem\nAccount Number: 0809383001\nIBAN: PK71DUIB0000000809383001")}
+                      onClick={() => handleCopy("Bank Name: Mashreq Bank\nAccount Title: IRTAZA COMMUNICATION\nIBAN: PK36MSHQ0000089200164395")}
                       className="px-2.5 py-1 rounded-lg bg-blue-950 border border-blue-500/40 text-blue-300 text-[10px] font-bold hover:bg-blue-900 transition-colors cursor-pointer flex items-center gap-1"
                     >
                       {copiedAddress ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -309,22 +375,17 @@ export const IBMembershipModal: React.FC<IBMembershipModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
                       <span className="text-[10px] text-slate-400 block uppercase font-bold">Bank Name</span>
-                      <span className="text-white font-bold">Dubai Islamic Bank</span>
+                      <span className="text-white font-bold">Mashreq Bank</span>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                    <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 sm:col-span-1">
                       <span className="text-[10px] text-slate-400 block uppercase font-bold">Account Title</span>
-                      <span className="text-amber-400 font-bold">Muhammad Nadeem</span>
+                      <span className="text-amber-400 font-bold">IRTAZA COMMUNICATION</span>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Account Number</span>
-                      <span className="text-cyan-400 font-bold">0809383001</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                    <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 sm:col-span-2">
                       <span className="text-[10px] text-slate-400 block uppercase font-bold">IBAN</span>
-                      <span className="text-emerald-400 font-bold break-all">PK71DUIB0000000809383001</span>
+                      <span className="text-emerald-400 font-bold break-all">PK36MSHQ0000089200164395</span>
                     </div>
                   </div>
                 </div>

@@ -68,7 +68,7 @@ export interface IBCommission {
   clientEmail: string;
   investmentId: string;
   investmentAmount: string;
-  commissionRate: number; // 20%
+  commissionRate: number; // 10%
   commissionAmount: string;
   status: 'PAID' | 'WITHDRAWN';
   createdAt: string;

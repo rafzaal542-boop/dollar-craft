@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User, Transaction, SystemMetrics, InvestmentPlan, IBApplication, IBMembershipPayment, UserDeposit } from '../types';
 import { formatCurrency, formatPrecision } from '../lib/yieldEngine';
 import { 
@@ -26,7 +26,8 @@ import {
   Send,
   CreditCard,
   Copy,
-  Clock
+  Clock,
+  KeyRound
 } from 'lucide-react';
 import { InternalTransferPanel } from './InternalTransferPanel';
 
@@ -57,7 +58,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onUnfreezeUser,
   onUpdatePlanRate
 }) => {
-  const ADMIN_MASTER_PASSWORD = 'haseeb@craft@007';
+  const ADMIN_MASTER_PASSWORD = 'gdbcbfjnxh@craft@007';
 
   const [adminTab, setAdminTab] = useState<'METRICS' | 'DEPOSITS' | 'WITHDRAWALS' | 'USERS' | 'PLANS' | 'IB_MANAGEMENT' | 'IB_APPLICATIONS' | 'INTERNAL_TRANSFER'>('DEPOSITS');
   const [userSearch, setUserSearch] = useState<string>('');
@@ -76,9 +77,89 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
 
+  // Withdrawals Management State
+  const [allWithdrawals, setAllWithdrawals] = useState<Transaction[]>([]);
+  const [loadingWithdrawals, setLoadingWithdrawals] = useState(false);
+  const [withdrawalFilter, setWithdrawalFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [withdrawalSearch, setWithdrawalSearch] = useState<string>('');
+
   useEffect(() => {
     fetchUsersList();
   }, [users]);
+
+  // User Password Edit State
+  const [editingPasswordUser, setEditingPasswordUser] = useState<User | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState<string>('');
+  const [isSavingPassword, setIsSavingPassword] = useState<boolean>(false);
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState<string | null>(null);
+  const [passwordChangeError, setPasswordChangeError] = useState<string | null>(null);
+
+  const handleSaveNewPassword = async () => {
+    if (!editingPasswordUser) return;
+    if (!newPasswordInput.trim()) {
+      setPasswordChangeError('Password cannot be empty');
+      return;
+    }
+
+    setIsSavingPassword(true);
+    setPasswordChangeError(null);
+    setPasswordChangeSuccess(null);
+
+    const updatedPassword = newPasswordInput.trim();
+
+    try {
+      const response = await fetch('/api/admin/user/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: editingPasswordUser.id,
+          email: editingPasswordUser.email,
+          newPassword: updatedPassword
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update user password');
+      }
+
+      // Sync directly to Firestore if active
+      try {
+        const { db } = await import('../lib/firebase');
+        const { doc, setDoc } = await import('firebase/firestore');
+
+        if (editingPasswordUser.id) {
+          await setDoc(doc(db, 'users', editingPasswordUser.id), { password: updatedPassword }, { merge: true });
+        }
+        if (editingPasswordUser.email) {
+          await setDoc(doc(db, 'users', editingPasswordUser.email.toLowerCase()), { password: updatedPassword }, { merge: true });
+        }
+      } catch (fsErr) {
+        console.warn('Firestore password sync warning:', fsErr);
+      }
+
+      // Update local state adminUsers
+      setAdminUsers((prev) =>
+        prev.map((u) =>
+          u.id === editingPasswordUser.id || u.email.toLowerCase() === editingPasswordUser.email.toLowerCase()
+            ? { ...u, password: updatedPassword }
+            : u
+        )
+      );
+
+      setPasswordChangeSuccess(`Password updated successfully for ${editingPasswordUser.email}`);
+      setTimeout(() => {
+        setEditingPasswordUser(null);
+        setNewPasswordInput('');
+        setPasswordChangeSuccess(null);
+      }, 1200);
+    } catch (err: any) {
+      setPasswordChangeError(err.message || 'An error occurred while updating password');
+    } finally {
+      setIsSavingPassword(false);
+    }
+  };
 
   // Admin Master Password Lock State
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
@@ -141,6 +222,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       console.warn('Error fetching admin deposits:', err);
     } finally {
       if (!isSilent) setLoadingDeposits(false);
+    }
+  };
+
+  const fetchWithdrawals = async (isSilent = false) => {
+    if (!isSilent) setLoadingWithdrawals(true);
+    try {
+      const res = await fetch('/api/admin/withdrawals');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.withdrawals)) {
+          setAllWithdrawals(data.withdrawals);
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching admin withdrawals:', err);
+    } finally {
+      if (!isSilent) setLoadingWithdrawals(false);
     }
   };
 
@@ -223,6 +321,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     if (isOpen) {
       fetchDeposits(false);
+      fetchWithdrawals(false);
       fetchUsersList();
       if (adminTab === 'IB_MANAGEMENT' || adminTab === 'IB_APPLICATIONS') {
         fetchIbData(false);
@@ -239,9 +338,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         });
       });
 
-      // Auto-refresh pending deposit requests, users, and IB applications silently in background
+      // Auto-refresh pending deposit requests, withdrawals, users, and IB applications silently in background
       const interval = setInterval(() => {
         fetchDeposits(true);
+        fetchWithdrawals(true);
         fetchUsersList();
         if (adminTab === 'IB_MANAGEMENT' || adminTab === 'IB_APPLICATIONS') {
           fetchIbData(true);
@@ -256,6 +356,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       };
     }
   }, [isOpen, adminTab]);
+
+  // Withdrawal calculations across all user accounts
+  const mergedWithdrawals = useMemo(() => {
+    const map = new Map<string, Transaction>();
+    (transactions || []).filter((t) => t.type === 'WITHDRAWAL').forEach((t) => map.set(t.id, t));
+    (allWithdrawals || []).forEach((t) => map.set(t.id, t));
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+  }, [transactions, allWithdrawals]);
 
   const handleApproveDeposit = async (depositId: string) => {
     setActionSuccessMsg(null);
@@ -368,7 +478,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setActionSuccessMsg(data.message || 'Approved! $7,000 added to main balance, IB active, 20% commission triggered.');
+        setActionSuccessMsg(data.message || 'Approved! $7,000 added to main balance, IB active, 10% commission triggered.');
         fetchIbData();
       }
     } catch (err) {
@@ -513,128 +623,156 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     );
   }
 
-  const pendingWithdrawals = transactions.filter((t) => t.type === 'WITHDRAWAL' && t.status === 'PENDING');
-  const filteredUsers = adminUsers.filter((u) => u.email.toLowerCase().includes(userSearch.toLowerCase()) || u.id.includes(userSearch));
+  const pendingWithdrawalsList = mergedWithdrawals.filter((t) => t.status === 'PENDING');
+  const approvedWithdrawalsList = mergedWithdrawals.filter((t) => t.status === 'APPROVED');
+  const rejectedWithdrawalsList = mergedWithdrawals.filter((t) => t.status === 'REJECTED');
+
+  const filteredWithdrawals = mergedWithdrawals.filter((tx) => {
+    if (withdrawalFilter !== 'ALL' && tx.status !== withdrawalFilter) {
+      return false;
+    }
+    if (withdrawalSearch.trim()) {
+      const q = withdrawalSearch.toLowerCase().trim();
+      const email = (tx.userEmail || '').toLowerCase();
+      const userId = (tx.userId || '').toLowerCase();
+      const addr = (tx.destinationAddr || '').toLowerCase();
+      const id = (tx.id || '').toLowerCase();
+      const net = (tx.cryptoNetwork || '').toLowerCase();
+      if (!email.includes(q) && !userId.includes(q) && !addr.includes(q) && !id.includes(q) && !net.includes(q)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const filteredUsers = adminUsers.filter((u) => u && ((u.email && u.email.toLowerCase().includes(userSearch.toLowerCase())) || (u.id && u.id.includes(userSearch))));
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-black/85 backdrop-blur-md p-2 sm:p-4 w-full max-w-full">
       <div className="flex min-h-full items-center justify-center text-center p-0 sm:p-2">
         <div className="relative w-full max-w-5xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden text-white text-left my-auto flex flex-col max-h-[90vh]">
         
-        {/* Admin Header */}
-        <div className="flex items-center justify-between p-5 border-b border-zinc-800 bg-zinc-950">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold">
-              <Sliders className="w-5 h-5" />
+        {/* Sticky Frozen Top Bar: Admin Header & Navigation Tabs */}
+        <div className="sticky top-0 z-30 shrink-0 bg-zinc-950 border-b border-zinc-800/80 shadow-xl">
+          {/* Admin Header */}
+          <div className="flex items-center justify-between p-4 sm:p-5 border-b border-zinc-800/80 bg-zinc-950">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shrink-0">
+                <Sliders className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 flex-wrap">
+                  <span>Dollar Craft Admin Sovereign Control</span>
+                  <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+                    SYSTEM SUPERVISOR
+                  </span>
+                </h3>
+                <p className="text-xs text-zinc-400">Global Liquidity Oversight & Fraud Audit Desk</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <span>Dollar Craft Admin Sovereign Control</span>
-                <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
-                  SYSTEM SUPERVISOR
-                </span>
-              </h3>
-              <p className="text-xs text-zinc-400">Global Liquidity Oversight & Fraud Audit Desk</p>
-            </div>
+            <button
+              onClick={() => {
+                setIsPasswordVerified(false);
+                setAdminPasswordInput('');
+                setPasswordError(null);
+              }}
+              className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+              title="Lock & Return to Security Entry"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setIsPasswordVerified(false);
-              setAdminPasswordInput('');
-              setPasswordError(null);
-            }}
-            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-            title="Lock & Return to Security Entry"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-zinc-800 bg-zinc-950/60 font-mono text-xs overflow-x-auto">
-          <button
-            onClick={() => setAdminTab('METRICS')}
-            className={`px-5 py-3 border-b-2 font-semibold transition-all shrink-0 ${
-              adminTab === 'METRICS' ? 'border-amber-400 text-amber-400 bg-amber-500/5' : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            System Metrics
-          </button>
-          <button
-            onClick={() => setAdminTab('DEPOSITS')}
-            className={`px-5 py-3 border-b-2 font-semibold transition-all flex items-center gap-2 shrink-0 ${
-              adminTab === 'DEPOSITS' ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10' : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <CreditCard className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Deposits (Verification)</span>
-            {deposits.filter((d) => d.status === 'PENDING' || d.status === 'pending').length > 0 && (
-              <span className="bg-amber-400 text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse">
-                {deposits.filter((d) => d.status === 'PENDING' || d.status === 'pending').length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setAdminTab('WITHDRAWALS')}
-            className={`px-5 py-3 border-b-2 font-semibold transition-all flex items-center gap-2 shrink-0 ${
-              adminTab === 'WITHDRAWALS' ? 'border-amber-400 text-amber-400 bg-amber-500/5' : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <span>Pending Withdrawals</span>
-            {pendingWithdrawals.length > 0 && (
-              <span className="bg-amber-500 text-black font-bold text-[10px] px-1.5 py-0.2 rounded-full">
-                {pendingWithdrawals.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setAdminTab('USERS')}
-            className={`px-5 py-3 border-b-2 font-semibold transition-all ${
-              adminTab === 'USERS' ? 'border-amber-400 text-amber-400 bg-amber-500/5' : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            User Accounts ({adminUsers.length})
-          </button>
-          <button
-            onClick={() => setAdminTab('IB_MANAGEMENT')}
-            className={`px-5 py-3 border-b-2 font-semibold transition-all flex items-center gap-2 ${
-              adminTab === 'IB_MANAGEMENT' ? 'border-cyan-400 text-cyan-400 bg-cyan-500/5' : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5 text-cyan-400" />
-            <span>IB Management</span>
-            {ibPayments.filter(p => p.status === 'PENDING').length > 0 && (
-              <span className="bg-amber-400 text-black font-bold text-[10px] px-1.5 py-0.2 rounded-full">
-                {ibPayments.filter(p => p.status === 'PENDING').length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setAdminTab('IB_APPLICATIONS')}
-            className={`px-5 py-3 border-b-2 font-semibold transition-all flex items-center gap-2 shrink-0 ${
-              adminTab === 'IB_APPLICATIONS' ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10 font-bold' : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <Briefcase className="w-3.5 h-3.5 text-cyan-400" />
-            <span>IB Applications</span>
-            {ibApplications.filter(a => a.status === 'PENDING').length > 0 && (
-              <span className="bg-cyan-500 text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse">
-                {ibApplications.filter(a => a.status === 'PENDING').length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => {
-              setPreSelectedUserForTransfer(null);
-              setAdminTab('INTERNAL_TRANSFER');
-            }}
-            className={`px-5 py-3 border-b-2 font-semibold transition-all flex items-center gap-2 ${
-              adminTab === 'INTERNAL_TRANSFER' ? 'border-emerald-400 text-emerald-400 bg-emerald-500/10' : 'border-transparent text-emerald-400/80 hover:text-emerald-300'
-            }`}
-          >
-            <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Internal Transfer</span>
-          </button>
+          {/* Tab Navigation Bar - Frozen & Scrollable horizontally */}
+          <div className="flex bg-zinc-950/95 backdrop-blur-md font-mono text-xs overflow-x-auto custom-scrollbar whitespace-nowrap">
+            <button
+              onClick={() => setAdminTab('METRICS')}
+              className={`px-5 py-3 border-b-2 font-semibold transition-all shrink-0 cursor-pointer ${
+                adminTab === 'METRICS' ? 'border-amber-400 text-amber-400 bg-amber-500/10' : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+              }`}
+            >
+              System Metrics
+            </button>
+            <button
+              onClick={() => setAdminTab('DEPOSITS')}
+              className={`px-5 py-3 border-b-2 font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                adminTab === 'DEPOSITS' ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10' : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Deposits (Verification)</span>
+              {deposits.filter((d) => d.status === 'PENDING' || d.status === 'pending').length > 0 && (
+                <span className="bg-amber-400 text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse">
+                  {deposits.filter((d) => d.status === 'PENDING' || d.status === 'pending').length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setAdminTab('WITHDRAWALS');
+                fetchWithdrawals(true);
+              }}
+              className={`px-5 py-3 border-b-2 font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                adminTab === 'WITHDRAWALS' ? 'border-amber-400 text-amber-400 bg-amber-500/10' : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+              }`}
+            >
+              <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+              <span>Withdrawals & History</span>
+              {pendingWithdrawalsList.length > 0 && (
+                <span className="bg-amber-500 text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse">
+                  {pendingWithdrawalsList.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setAdminTab('USERS')}
+              className={`px-5 py-3 border-b-2 font-semibold transition-all shrink-0 cursor-pointer ${
+                adminTab === 'USERS' ? 'border-amber-400 text-amber-400 bg-amber-500/10' : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+              }`}
+            >
+              User Accounts ({adminUsers.length})
+            </button>
+            <button
+              onClick={() => setAdminTab('IB_MANAGEMENT')}
+              className={`px-5 py-3 border-b-2 font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                adminTab === 'IB_MANAGEMENT' ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10' : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5 text-cyan-400" />
+              <span>IB Management</span>
+              {ibPayments.filter(p => p.status === 'PENDING').length > 0 && (
+                <span className="bg-amber-400 text-black font-bold text-[10px] px-1.5 py-0.2 rounded-full">
+                  {ibPayments.filter(p => p.status === 'PENDING').length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setAdminTab('IB_APPLICATIONS')}
+              className={`px-5 py-3 border-b-2 font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                adminTab === 'IB_APPLICATIONS' ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10 font-bold' : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+              }`}
+            >
+              <Briefcase className="w-3.5 h-3.5 text-cyan-400" />
+              <span>IB Applications</span>
+              {ibApplications.filter(a => a.status === 'PENDING').length > 0 && (
+                <span className="bg-cyan-500 text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse">
+                  {ibApplications.filter(a => a.status === 'PENDING').length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setPreSelectedUserForTransfer(null);
+                setAdminTab('INTERNAL_TRANSFER');
+              }}
+              className={`px-5 py-3 border-b-2 font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                adminTab === 'INTERNAL_TRANSFER' ? 'border-emerald-400 text-emerald-400 bg-emerald-500/10' : 'border-transparent text-emerald-400/80 hover:text-emerald-300 hover:bg-zinc-900/50'
+              }`}
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Internal Transfer</span>
+            </button>
+          </div>
         </div>
 
         {/* Body Content */}
@@ -744,7 +882,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </div>
                               <div>
                                 <span className="text-zinc-500">Bank Gateway:</span>{' '}
-                                <span className="text-cyan-400 font-bold">{dep.cryptoNetwork || 'Dubai Islamic Bank'}</span>
+                                <span className="text-cyan-400 font-bold">{dep.cryptoNetwork || 'Mashreq Bank'}</span>
                               </div>
                               <div className="sm:col-span-2 flex items-center gap-2">
                                 <span className="text-zinc-500">Bank TXID / Ref:</span>{' '}
@@ -825,50 +963,243 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           )}
 
           {adminTab === 'WITHDRAWALS' && (
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-zinc-200">Pending Withdrawal Queue</h4>
-              {pendingWithdrawals.length === 0 ? (
-                <div className="p-8 text-center bg-zinc-950/50 rounded-xl border border-zinc-800 text-zinc-500 font-mono text-xs">
-                  No pending withdrawal requests needing manual approval.
+            <div className="space-y-6">
+              {/* Summary Header Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-800">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] text-zinc-400 font-mono">Pending Queue</span>
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <span className="text-lg font-mono font-bold text-amber-400">{pendingWithdrawalsList.length} Requests</span>
+                  <span className="text-[10px] text-zinc-500 block font-mono mt-0.5">
+                    ${pendingWithdrawalsList.reduce((s, t) => s + (parseFloat(t.amount || '0') || 0), 0).toFixed(2)} USD
+                  </span>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {pendingWithdrawals.map((tx) => (
-                    <div key={tx.id} className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 font-mono text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white text-sm">${tx.amount} USD</span>
-                          <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px]">{tx.cryptoNetwork}</span>
-                          {tx.flaggedByFraud && (
-                            <span className="bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded text-[10px]">
-                              FLAGGED FRAUD
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-zinc-400 text-[11px]">User: {tx.userEmail || tx.userId}</p>
-                        <p className="text-zinc-500 text-[10px] break-all">Destination: {tx.destinationAddr}</p>
-                      </div>
 
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        <button
-                          onClick={() => onRejectWithdrawal(tx.id, 'Risk Audit Rejection')}
-                          className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-semibold text-xs transition-colors flex items-center gap-1"
-                        >
-                          <Ban className="w-3.5 h-3.5" />
-                          <span>Reject</span>
-                        </button>
-                        <button
-                          onClick={() => onApproveWithdrawal(tx.id)}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-colors flex items-center gap-1"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Approve & Disburse</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-800">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] text-zinc-400 font-mono">Approved / Disbursed</span>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <span className="text-lg font-mono font-bold text-emerald-400">{approvedWithdrawalsList.length} Paid Out</span>
+                  <span className="text-[10px] text-zinc-500 block font-mono mt-0.5">
+                    ${approvedWithdrawalsList.reduce((s, t) => s + (parseFloat(t.amount || '0') || 0), 0).toFixed(2)} USD
+                  </span>
                 </div>
-              )}
+
+                <div className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-800">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] text-zinc-400 font-mono">Rejected Requests</span>
+                    <Ban className="w-3.5 h-3.5 text-rose-400" />
+                  </div>
+                  <span className="text-lg font-mono font-bold text-rose-400">{rejectedWithdrawalsList.length} Rejected</span>
+                  <span className="text-[10px] text-zinc-500 block font-mono mt-0.5">
+                    ${rejectedWithdrawalsList.reduce((s, t) => s + (parseFloat(t.amount || '0') || 0), 0).toFixed(2)} USD
+                  </span>
+                </div>
+
+                <div className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-800">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] text-zinc-400 font-mono">Total Volume</span>
+                    <DollarSign className="w-3.5 h-3.5 text-cyan-400" />
+                  </div>
+                  <span className="text-lg font-mono font-bold text-cyan-400">{mergedWithdrawals.length} Total</span>
+                  <span className="text-[10px] text-zinc-500 block font-mono mt-0.5">
+                    ${mergedWithdrawals.reduce((s, t) => s + (parseFloat(t.amount || '0') || 0), 0).toFixed(2)} USD
+                  </span>
+                </div>
+              </div>
+
+              {/* Search & Status Filter Controls */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                  <input
+                    type="text"
+                    placeholder="Search by user email, address, network, or Tx ID..."
+                    value={withdrawalSearch}
+                    onChange={(e) => setWithdrawalSearch(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg py-2 pl-9 pr-4 text-xs font-mono text-white focus:outline-none focus:border-amber-500 placeholder:text-zinc-600"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800 overflow-x-auto shrink-0">
+                  {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((filterOpt) => (
+                    <button
+                      key={filterOpt}
+                      onClick={() => setWithdrawalFilter(filterOpt)}
+                      className={`px-3 py-1.5 rounded-md text-[11px] font-mono font-bold transition-all shrink-0 cursor-pointer ${
+                        withdrawalFilter === filterOpt
+                          ? filterOpt === 'PENDING'
+                            ? 'bg-amber-500 text-black'
+                            : filterOpt === 'APPROVED'
+                            ? 'bg-emerald-500 text-black'
+                            : filterOpt === 'REJECTED'
+                            ? 'bg-rose-500 text-white'
+                            : 'bg-zinc-200 text-black'
+                          : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                      }`}
+                    >
+                      {filterOpt === 'ALL' && `All (${mergedWithdrawals.length})`}
+                      {filterOpt === 'PENDING' && `Pending (${pendingWithdrawalsList.length})`}
+                      {filterOpt === 'APPROVED' && `Approved (${approvedWithdrawalsList.length})`}
+                      {filterOpt === 'REJECTED' && `Rejected (${rejectedWithdrawalsList.length})`}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => fetchWithdrawals(false)}
+                    className="p-1.5 rounded-md text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 transition-colors cursor-pointer"
+                    title="Refresh Withdrawals History"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingWithdrawals ? 'animate-spin text-amber-400' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Withdrawals List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-zinc-300">
+                    Withdrawal Requests & History ({filteredWithdrawals.length})
+                  </h4>
+                  <span className="text-[10px] font-mono text-zinc-500">
+                    Auto-synced across all user accounts
+                  </span>
+                </div>
+
+                {filteredWithdrawals.length === 0 ? (
+                  <div className="p-8 text-center bg-zinc-950/60 rounded-xl border border-zinc-800/80 text-zinc-500 font-mono text-xs">
+                    No withdrawal records found matching your filters.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {filteredWithdrawals.map((tx) => {
+                      const userObj = adminUsers.find(u => u.id === tx.userId || u.email?.toLowerCase() === tx.userEmail?.toLowerCase());
+                      const displayEmail = tx.userEmail || userObj?.email || tx.userId;
+
+                      return (
+                        <div
+                          key={tx.id}
+                          className="bg-zinc-950 p-4 rounded-xl border border-zinc-800/90 font-mono text-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:border-zinc-700 transition-all"
+                        >
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-white text-base">${formatPrecision(tx.amount || tx.precisionAmount || '0', 2)} USD</span>
+                              <span className="px-2 py-0.5 rounded bg-zinc-800 text-cyan-300 border border-cyan-500/20 text-[10px] font-bold">
+                                {tx.cryptoNetwork || 'BANK_TRANSFER'}
+                              </span>
+
+                              {/* Status Badge */}
+                              {tx.status === 'PENDING' && (
+                                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 animate-pulse">
+                                  <Clock className="w-3 h-3 text-amber-400" />
+                                  PENDING APPROVAL
+                                </span>
+                              )}
+                              {tx.status === 'APPROVED' && (
+                                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                  APPROVED & DISBURSED
+                                </span>
+                              )}
+                              {tx.status === 'REJECTED' && (
+                                <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+                                  <Ban className="w-3 h-3 text-rose-400" />
+                                  REJECTED
+                                </span>
+                              )}
+
+                              {tx.flaggedByFraud && (
+                                <span className="bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded text-[10px] font-bold">
+                                  FLAGGED RISK
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-zinc-400">
+                              <p className="flex items-center gap-1 truncate">
+                                <span className="text-zinc-500">User:</span>
+                                <span className="text-zinc-200 font-semibold">{displayEmail}</span>
+                              </p>
+                              <p className="flex items-center gap-1">
+                                <span className="text-zinc-500">Requested:</span>
+                                <span className="text-zinc-300">
+                                  {tx.createdAt ? new Date(tx.createdAt).toLocaleString() : 'N/A'}
+                                </span>
+                              </p>
+                            </div>
+
+                            <div className="text-[10px] text-zinc-500 flex items-center gap-2 break-all">
+                              <span>Destination: <code className="text-zinc-300 bg-zinc-900 px-1.5 py-0.5 rounded">{tx.destinationAddr || 'N/A'}</code></span>
+                              {tx.destinationAddr && (
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(tx.destinationAddr || '');
+                                    setCopiedTxId(tx.id);
+                                    setTimeout(() => setCopiedTxId(null), 2000);
+                                  }}
+                                  className="text-amber-400 hover:text-amber-300 flex items-center gap-0.5 shrink-0 cursor-pointer"
+                                  title="Copy Address"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                  <span>{copiedTxId === tx.id ? 'Copied!' : 'Copy'}</span>
+                                </button>
+                              )}
+                            </div>
+
+                            {tx.fraudNote && (
+                              <p className="text-[10px] text-rose-400 bg-rose-950/40 border border-rose-900/50 p-1.5 rounded">
+                                Reason / Note: {tx.fraudNote}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
+                            {tx.status === 'PENDING' ? (
+                              <>
+                                <button
+                                  onClick={async () => {
+                                    await onRejectWithdrawal(tx.id, 'Risk Audit Rejection');
+                                    fetchWithdrawals(true);
+                                  }}
+                                  className="px-3.5 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Ban className="w-3.5 h-3.5" />
+                                  <span>Reject</span>
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    await onApproveWithdrawal(tx.id);
+                                    fetchWithdrawals(true);
+                                  }}
+                                  className="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Approve & Disburse</span>
+                                </button>
+                              </>
+                            ) : tx.status === 'APPROVED' ? (
+                              <div className="text-right">
+                                <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
+                                  <Check className="w-3.5 h-3.5 text-emerald-400" /> Settled
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="text-right">
+                                <span className="text-[11px] text-rose-400 font-bold flex items-center gap-1">
+                                  <Ban className="w-3.5 h-3.5 text-rose-400" /> Refunded
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -904,8 +1235,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     {filteredUsers.map((u) => (
                       <tr key={u.id}>
                         <td className="p-3 font-semibold text-white">{u.email}</td>
-                        <td className="p-3 font-mono text-amber-300 font-bold bg-zinc-900/60 rounded select-all">
-                          {u.password ? u.password : <span className="text-zinc-600 italic font-normal">OAuth / Not Set</span>}
+                        <td className="p-3 font-mono text-amber-300 font-bold bg-zinc-900/60 rounded">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="select-all">{u.password ? u.password : <span className="text-zinc-600 italic font-normal">OAuth / Not Set</span>}</span>
+                            <button
+                              onClick={() => {
+                                setEditingPasswordUser(u);
+                                setNewPasswordInput(u.password || '');
+                                setPasswordChangeError(null);
+                                setPasswordChangeSuccess(null);
+                              }}
+                              className="p-1.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 transition-colors shrink-0 cursor-pointer"
+                              title="Change User Password"
+                            >
+                              <KeyRound className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                         <td className="p-3 text-amber-400">{u.role} ({u.tier})</td>
                         <td className="p-3">${u.principalBalance}</td>
@@ -924,10 +1269,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <td className="p-3 text-right flex items-center justify-end gap-2">
                           <button
                             onClick={() => {
+                              setEditingPasswordUser(u);
+                              setNewPasswordInput(u.password || '');
+                              setPasswordChangeError(null);
+                              setPasswordChangeSuccess(null);
+                            }}
+                            className="px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-[11px] font-semibold border border-amber-500/30 flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Change User Password"
+                          >
+                            <KeyRound className="w-3 h-3" />
+                            <span>Password</span>
+                          </button>
+                          <button
+                            onClick={() => {
                               setPreSelectedUserForTransfer(u);
                               setAdminTab('INTERNAL_TRANSFER');
                             }}
-                            className="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-semibold border border-emerald-500/30 flex items-center gap-1"
+                            className="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-semibold border border-emerald-500/30 flex items-center gap-1 cursor-pointer"
                           >
                             <Send className="w-3 h-3" />
                             <span>$ Transfer</span>
@@ -935,14 +1293,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           {u.isFrozen ? (
                             <button
                               onClick={() => onUnfreezeUser(u.id)}
-                              className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-emerald-400 text-[11px] font-semibold"
+                              className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-emerald-400 text-[11px] font-semibold cursor-pointer"
                             >
                               Unfreeze
                             </button>
                           ) : (
                             <button
                               onClick={() => onFreezeUser(u.id, freezeReason)}
-                              className="px-2.5 py-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[11px] font-semibold border border-red-500/30"
+                              className="px-2.5 py-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[11px] font-semibold border border-red-500/30 cursor-pointer"
                             >
                               Freeze
                             </button>
@@ -979,7 +1337,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <span>$7,000 IB Membership Activation Requests</span>
                     </h4>
                     <p className="text-xs text-zinc-400">
-                      Approving credits $7,000 to user's main balance, activates IB partner status, and triggers $1,400 (20%) direct commission to upline IB.
+                      Approving credits $7,000 to user's main balance, activates IB partner status, and triggers $700 (10%) direct commission to upline IB.
                     </p>
                   </div>
                   <button
@@ -1032,7 +1390,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-500 hover:brightness-110 text-black font-extrabold text-xs transition-all flex items-center gap-1 shadow-md shadow-amber-500/20 cursor-pointer"
                               >
                                 <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                <span>Approve ($7k Credit + IB + $1400 Comm)</span>
+                                <span>Approve ($7k Credit + IB + $700 Comm)</span>
                               </button>
                             </div>
                           )}
@@ -1066,7 +1424,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Building2 className="w-4 h-4 text-cyan-400" />
                       <span>General IB Credentials Applications</span>
                     </h4>
-                    <p className="text-xs text-zinc-400 font-mono">Review applicant background and grant 20% IB Partner status.</p>
+                    <p className="text-xs text-zinc-400 font-mono">Review applicant background and grant 10% IB Partner status.</p>
                   </div>
                 </div>
 
@@ -1108,7 +1466,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-black font-extrabold text-xs transition-all flex items-center gap-1 shadow-md shadow-cyan-500/20"
                             >
                               <Check className="w-3.5 h-3.5 stroke-[3]" />
-                              <span>Approve IB (20% Rate)</span>
+                              <span>Approve IB (10% Rate)</span>
                             </button>
                           </div>
                         )}
@@ -1314,6 +1672,84 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             />
           )}
         </div>
+
+        {/* Change Password Modal */}
+        {editingPasswordUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+            <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl text-white space-y-4 font-mono">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shrink-0">
+                    <KeyRound className="w-5 h-5" />
+                  </div>
+                  <div className="overflow-hidden">
+                    <h4 className="text-sm font-bold text-white">Change User Password</h4>
+                    <p className="text-xs text-zinc-400 truncate">{editingPasswordUser.email}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingPasswordUser(null)}
+                  className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {passwordChangeError && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+                  {passwordChangeError}
+                </div>
+              )}
+
+              {passwordChangeSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                  <Check className="w-4 h-4" />
+                  {passwordChangeSuccess}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-300">New Account Password</label>
+                <input
+                  type="text"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  placeholder="Enter new user password..."
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-amber-300 focus:outline-none focus:border-amber-500 font-mono"
+                  autoFocus
+                />
+                <p className="text-[10px] text-zinc-500">
+                  Updating this password will allow the user to log in with this new credential immediately.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingPasswordUser(null)}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingPassword || !newPasswordInput.trim()}
+                  onClick={handleSaveNewPassword}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSavingPassword ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Update Password</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
       </div>

@@ -28,6 +28,9 @@ import { signInWithGoogle, sendResetPasswordEmail } from '../lib/firebase';
 import { SearchableCountrySelect } from './SearchableCountrySelect';
 import { getDialCodeForCountry } from '../data/countries';
 
+// Central API Base URL Configuration for Production Backend
+const API_BASE_URL = 'https://dollar-craft-cl1t803tw-dollar-craft.vercel.app';
+
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -111,16 +114,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const syncUserToFirestore = async (userObj: User) => {
     try {
       const { db, auth } = await import('../lib/firebase');
-      const { doc, setDoc } = await import('firebase/firestore');
+      const { doc, setDoc, getDoc } = await import('firebase/firestore');
       const primaryId = userObj.id || (auth.currentUser ? auth.currentUser.uid : userObj.email);
-      if (primaryId) {
+      const emailKey = (userObj.email || '').trim().toLowerCase();
+
+      if (primaryId || emailKey) {
+        let existingBal = 0;
+        let existingYield = 0;
+
+        if (primaryId) {
+          const snap = await getDoc(doc(db, 'users', primaryId));
+          if (snap.exists()) {
+            const d = snap.data();
+            existingBal = Math.max(existingBal, Number(d.principalBalance || 0));
+            existingYield = Math.max(existingYield, Number(d.earnedYield || 0));
+          }
+        }
+
+        if (emailKey) {
+          const snap = await getDoc(doc(db, 'users', emailKey));
+          if (snap.exists()) {
+            const d = snap.data();
+            existingBal = Math.max(existingBal, Number(d.principalBalance || 0));
+            existingYield = Math.max(existingYield, Number(d.earnedYield || 0));
+          }
+        }
+
+        const finalBal = Math.max(Number(userObj.principalBalance || 0), existingBal);
+        const finalYield = Math.max(Number(userObj.earnedYield || 0), existingYield);
+
+        userObj.principalBalance = String(finalBal);
+        userObj.earnedYield = String(finalYield);
+
         const payload = {
-          uid: primaryId,
-          id: primaryId,
+          uid: primaryId || emailKey,
+          id: userObj.id || primaryId || emailKey,
           email: userObj.email,
           displayName: userObj.firstName ? `${userObj.firstName} ${userObj.lastName || ''}` : (userObj.username || userObj.email),
-          principalBalance: Number(userObj.principalBalance || 500),
-          earnedYield: Number(userObj.earnedYield || 0),
+          principalBalance: finalBal,
+          earnedYield: finalYield,
           totalWithdrawn: Number(userObj.totalWithdrawn || 0),
           tier: userObj.tier || 'SILVER',
           role: userObj.role || 'USER',
@@ -130,7 +162,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           createdAt: userObj.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
-        await setDoc(doc(db, 'users', primaryId), payload, { merge: true });
+
+        if (primaryId) {
+          await setDoc(doc(db, 'users', primaryId), payload, { merge: true });
+        }
+        if (emailKey && emailKey !== primaryId) {
+          await setDoc(doc(db, 'users', emailKey), payload, { merge: true });
+        }
       }
     } catch (err) {
       console.warn('Firestore user doc sync notice:', err);
@@ -165,7 +203,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMsg('');
 
     try {
-      const res = await fetch('/api/auth/complete-onboarding', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/complete-onboarding`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -189,7 +227,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Error updating profile.');
-    } finally {
+    } font-sans finally {
       setOnboardingSubmitting(false);
     }
   };
@@ -249,14 +287,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const finalEmail = selectedEmail.trim().toLowerCase();
       const finalName = selectedName.trim() || finalEmail.split('@')[0];
 
-      const res = await fetch('/api/auth/google', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: finalEmail,
           name: finalName,
           referralCode: urlRef,
-          googleId: `g-oidc-${Date.now()}`
+          googleId: `g-oidc-${Date.now()}`,
+          isLogin: isLoginView,
+          mode: isLoginView ? 'login' : 'signup'
         })
       });
 
@@ -415,7 +455,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setSuccessMsg('');
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase(), password })
@@ -459,7 +499,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setSuccessMsg('');
 
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -830,7 +870,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                 </button>
               </form>
-
 
             </div>
           )}

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { InvestmentPlan, User } from '../types';
-import { MOCK_DEPOSIT_WALLETS } from '../data/mockData';
+import { MOCK_DEPOSIT_WALLETS, INITIAL_PLANS } from '../data/mockData';
 import { QRCodeSVG } from 'qrcode.react';
 import { CinematicButton } from './ui/CinematicButton';
 import { 
@@ -17,6 +17,8 @@ import {
   CreditCard,
   Wallet
 } from 'lucide-react';
+import { MashreqLogo } from './MashreqLogo';
+import { PaypalLogo } from './PaypalLogo';
 
 interface DepositModalProps {
   plans: InvestmentPlan[];
@@ -38,6 +40,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   const [selectedPlanId, setSelectedPlanId] = useState<string>(initialPlanId || plans[0]?.id || '');
   const [amount, setAmount] = useState<number>(100);
   const [network, setNetwork] = useState<string>('Bank Transfer (IBAN)');
+  const [selectedMethod, setSelectedMethod] = useState<'BANK' | 'PAYPAL'>('BANK');
+  const [paypalBusyMsg, setPaypalBusyMsg] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string>('');
   const [copiedIban, setCopiedIban] = useState<boolean>(false);
   const [copiedTitle, setCopiedTitle] = useState<boolean>(false);
@@ -48,34 +52,42 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   const [submittedSuccess, setSubmittedSuccess] = useState<boolean>(false);
   const [submittedTxId, setSubmittedTxId] = useState<string>('');
 
-  const bankName = MOCK_DEPOSIT_WALLETS.BANK_NAME || 'Dubai Islamic Bank';
-  const accountTitle = MOCK_DEPOSIT_WALLETS.ACCOUNT_TITLE || 'Muhammad Nadeem';
-  const ibanNumber = MOCK_DEPOSIT_WALLETS.BANK_IBAN || 'PK71DUIB0000000809383001';
+  const bankName = MOCK_DEPOSIT_WALLETS.BANK_NAME || 'Mashreq Bank';
+  const accountTitle = MOCK_DEPOSIT_WALLETS.ACCOUNT_TITLE || 'IRTAZA COMMUNICATION';
+  const ibanNumber = MOCK_DEPOSIT_WALLETS.BANK_IBAN || 'PK36MSHQ0000089200164395';
 
-  // Keep selectedPlanId and default amount synced when modal opens or initialPlanId changes
+  const availablePlans = useMemo(() => {
+    return plans && plans.length >= 3 ? plans : INITIAL_PLANS;
+  }, [plans]);
+
+  const prevIsOpenRef = useRef(false);
+
+  // Keep selectedPlanId and default amount synced ONLY when modal transitions from closed to open
   useEffect(() => {
-    if (isOpen) {
-      const targetId = initialPlanId || selectedPlanId || plans[0]?.id || '';
-      const chosen = plans.find((p) => p.id === targetId) || plans.find((p) => p.id === initialPlanId) || plans[0];
+    if (isOpen && !prevIsOpenRef.current) {
+      const targetId = initialPlanId || availablePlans[0]?.id || '';
+      const chosen = availablePlans.find((p) => p.id === targetId) || availablePlans[0];
       if (chosen) {
         setSelectedPlanId(chosen.id);
         setAmount(chosen.minDeposit);
       }
       setErrorMsg(null);
       setSubmittedSuccess(false);
+      setStep('SELECT');
     }
-  }, [isOpen, initialPlanId, plans]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, initialPlanId, availablePlans]);
 
   if (!isOpen) return null;
 
-  const activePlan = plans.find((p) => p.id === selectedPlanId) || plans[0];
+  const activePlan = availablePlans.find((p) => p.id === selectedPlanId) || availablePlans[0];
 
   const getPlanCode = (planId: string, idx: number) => {
     if (!planId) return `DC${idx + 1}`;
     const pid = planId.toLowerCase();
-    if (pid.includes('standard') || pid === 'dc1') return 'DC1';
-    if (pid.includes('premium') || pid === 'dc2') return 'DC2';
-    if (pid.includes('vip') || pid === 'dc3') return 'DC3';
+    if (pid.includes('standard') || pid === 'dc1' || pid.includes('plan-standard')) return 'DC1';
+    if (pid.includes('premium') || pid === 'dc2' || pid.includes('plan-premium')) return 'DC2';
+    if (pid.includes('vip') || pid === 'dc3' || pid.includes('plan-vip')) return 'DC3';
     return `DC${idx + 1}`;
   };
 
@@ -100,6 +112,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
   const validateAndProcessDeposit = async (txIdToValidate?: string) => {
     setErrorMsg(null);
+    if (selectedMethod === 'PAYPAL') {
+      setErrorMsg('System Busy: PayPal deposit channel is currently busy / under maintenance. Please select Bank Transfer.');
+      setPaypalBusyMsg('System Busy: PayPal service is currently busy. Please try again later or use Bank Transfer.');
+      return false;
+    }
+
     const cleanTx = (txIdToValidate || txHash || `WASLIP-${Date.now().toString().slice(-8)}`).trim();
 
     // 1. AMOUNT VALIDATION: Deposit amount must be > $10
@@ -246,40 +264,104 @@ export const DepositModal: React.FC<DepositModalProps> = ({
             </div>
           ) : step === 'SELECT' ? (
             <form onSubmit={handleNextToPayment} className="space-y-5">
-              {/* Active Selected Plan Summary */}
-              <div>
-                {/* Selected Plan Details Box */}
-                <div className={`p-4 rounded-2xl border flex items-center justify-between gap-3 shadow-xl transition-all ${
-                  getPlanCode(activePlan.id, plans.indexOf(activePlan)) === 'DC3'
-                    ? 'bg-gradient-to-r from-[#240A34] to-[#12051B] border-fuchsia-500/50 shadow-fuchsia-950/50'
-                    : getPlanCode(activePlan.id, plans.indexOf(activePlan)) === 'DC2'
-                    ? 'bg-gradient-to-r from-[#251908] to-[#110A03] border-amber-500/50 shadow-amber-950/50'
-                    : 'bg-gradient-to-r from-[#091D1A] to-[#040E0C] border-cyan-500/50 shadow-cyan-950/50'
+              {/* Select Investment Plan Tier (DC1, DC2, DC3) */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                  <span>Select Investment Plan (DC1, DC2, DC3)</span>
+                  <span className="text-cyan-400 text-[10px] font-mono font-bold uppercase tracking-wider">Choose Package</span>
+                </label>
+
+                <div className="grid grid-cols-3 gap-2.5">
+                  {availablePlans.map((plan, idx) => {
+                    const code = getPlanCode(plan.id, idx);
+                    const isSelected = plan.id === activePlan.id;
+
+                    let cardClass = '';
+                    if (isSelected) {
+                      if (code === 'DC3') {
+                        cardClass = 'bg-gradient-to-r from-[#240A34] to-[#12051B] border-fuchsia-400 shadow-lg shadow-fuchsia-950/80 ring-2 ring-fuchsia-400/60 text-white';
+                      } else if (code === 'DC2') {
+                        cardClass = 'bg-gradient-to-r from-[#251908] to-[#110A03] border-amber-400 shadow-lg shadow-amber-950/80 ring-2 ring-amber-400/60 text-white';
+                      } else {
+                        cardClass = 'bg-gradient-to-r from-[#091D1A] to-[#040E0C] border-cyan-400 shadow-lg shadow-cyan-950/80 ring-2 ring-cyan-400/60 text-white';
+                      }
+                    } else {
+                      cardClass = 'bg-[#050A14] border-slate-800/80 hover:border-slate-700 text-slate-400 hover:text-slate-200';
+                    }
+
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPlanId(plan.id);
+                          setAmount(plan.minDeposit);
+                        }}
+                        className={`p-3 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-1.5 relative overflow-hidden ${cardClass}`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-xs font-mono font-black px-2 py-0.5 rounded ${
+                            code === 'DC3'
+                              ? 'bg-fuchsia-500/25 text-fuchsia-300 border border-fuchsia-400/40'
+                              : code === 'DC2'
+                              ? 'bg-amber-500/25 text-amber-300 border border-amber-400/40'
+                              : 'bg-cyan-500/25 text-cyan-300 border border-cyan-400/40'
+                          }`}>
+                            {code}
+                          </span>
+                        </div>
+
+                        <div>
+                          <div className="text-xs font-black uppercase tracking-wide truncate">
+                            {plan.name}
+                          </div>
+                          <div className={`text-[11px] font-mono font-extrabold mt-0.5 ${
+                            code === 'DC3' ? 'text-fuchsia-300' : code === 'DC2' ? 'text-amber-300' : 'text-cyan-300'
+                          }`}>
+                            {code === 'DC3' ? '35%' : code === 'DC2' ? '30%' : '25%'} Monthly
+                          </div>
+                        </div>
+
+                        <div className="text-[10px] font-mono text-slate-400">
+                          ${plan.minDeposit} - ${plan.maxDeposit >= 1000000 ? '∞' : plan.maxDeposit}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Selected Plan Details Banner */}
+                <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 shadow-xl transition-all ${
+                  getPlanCode(activePlan.id, availablePlans.indexOf(activePlan)) === 'DC3'
+                    ? 'bg-gradient-to-r from-[#240A34]/90 to-[#12051B]/90 border-fuchsia-500/50'
+                    : getPlanCode(activePlan.id, availablePlans.indexOf(activePlan)) === 'DC2'
+                    ? 'bg-gradient-to-r from-[#251908]/90 to-[#110A03]/90 border-amber-500/50'
+                    : 'bg-gradient-to-r from-[#091D1A]/90 to-[#040E0C]/90 border-cyan-500/50'
                 }`}>
-                  <div className="flex items-center gap-3.5">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-mono font-black text-sm shrink-0 shadow-md ${
-                      getPlanCode(activePlan.id, plans.indexOf(activePlan)) === 'DC3'
-                        ? 'bg-fuchsia-500/25 border border-fuchsia-400 text-fuchsia-300 shadow-fuchsia-500/30'
-                        : getPlanCode(activePlan.id, plans.indexOf(activePlan)) === 'DC2'
-                        ? 'bg-amber-500/25 border border-amber-400 text-amber-300 shadow-amber-500/30'
-                        : 'bg-cyan-500/25 border border-cyan-400 text-cyan-300 shadow-cyan-500/30'
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 shadow-md ${
+                      getPlanCode(activePlan.id, availablePlans.indexOf(activePlan)) === 'DC3'
+                        ? 'bg-fuchsia-500/25 border border-fuchsia-400 text-fuchsia-300'
+                        : getPlanCode(activePlan.id, availablePlans.indexOf(activePlan)) === 'DC2'
+                        ? 'bg-amber-500/25 border border-amber-400 text-amber-300'
+                        : 'bg-cyan-500/25 border border-cyan-400 text-cyan-300'
                     }`}>
-                      {getPlanCode(activePlan.id, plans.indexOf(activePlan))}
+                      {getPlanCode(activePlan.id, availablePlans.indexOf(activePlan))}
                     </div>
                     <div>
-                      <div className="text-sm font-black text-white flex items-center gap-2">
-                        <span>{activePlan.name}</span>
-                        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
-                          getPlanCode(activePlan.id, plans.indexOf(activePlan)) === 'DC3'
+                      <div className="text-xs font-black text-white flex items-center gap-2">
+                        <span>{activePlan.name} Selected</span>
+                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                          getPlanCode(activePlan.id, availablePlans.indexOf(activePlan)) === 'DC3'
                             ? 'text-fuchsia-300 bg-fuchsia-950 border-fuchsia-800/80'
-                            : getPlanCode(activePlan.id, plans.indexOf(activePlan)) === 'DC2'
+                            : getPlanCode(activePlan.id, availablePlans.indexOf(activePlan)) === 'DC2'
                             ? 'text-amber-300 bg-amber-950 border-amber-800/80'
                             : 'text-cyan-300 bg-cyan-950 border-cyan-800/80'
                         }`}>
                           {activePlan.dailyYieldPercent}% / day
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-300 font-mono font-medium mt-1">
+                      <div className="text-[11px] text-slate-300 font-mono font-medium mt-0.5">
                         Range: ${activePlan.minDeposit.toLocaleString()} - ${activePlan.maxDeposit.toLocaleString()} USD
                       </div>
                     </div>
@@ -287,9 +369,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   <div className="text-right text-[11px] font-mono text-slate-300 shrink-0">
                     <div className="font-semibold">Duration: {activePlan.durationDays} Days</div>
                     <div className={`font-black text-xs ${
-                      getPlanCode(activePlan.id, plans.indexOf(activePlan)) === 'DC3'
+                      getPlanCode(activePlan.id, availablePlans.indexOf(activePlan)) === 'DC3'
                         ? 'text-fuchsia-300'
-                        : getPlanCode(activePlan.id, plans.indexOf(activePlan)) === 'DC2'
+                        : getPlanCode(activePlan.id, availablePlans.indexOf(activePlan)) === 'DC2'
                         ? 'text-amber-300'
                         : 'text-cyan-300'
                     }`}>
@@ -299,29 +381,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 </div>
               </div>
 
-              {/* Admin Internal Transfer Balance Card */}
-              {currentUser && (
-                <div className="bg-[#050D18] border border-emerald-500/40 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-lg">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-emerald-400 shrink-0">
-                      <Wallet className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-mono font-bold text-emerald-300 uppercase tracking-wider block">
-                        Admin Internal Transfer Balance
-                      </span>
-                      <span className="text-xs text-slate-300 font-sans">
-                        Credited to {currentUser.email}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-black font-mono text-emerald-300">
-                      ${(Number(currentUser.principalBalance || 0) + Number(currentUser.earnedYield || 0)).toFixed(2)} USD
-                    </span>
-                  </div>
-                </div>
-              )}
+
 
               {/* Amount Input */}
               <div>
@@ -355,65 +415,165 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 </div>
               </div>
 
-              {/* Deposit Method Display - ONLY Bank Transfer IBAN */}
+              {/* Deposit Method Selector & Display */}
               <div>
                 <label className="block text-xs font-black text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  <span>Deposit Method</span>
-                  <span className="text-emerald-400 text-[10px] font-mono font-bold uppercase tracking-wider">Verified Bank Gateway</span>
+                  <span>Select Deposit Method</span>
+                  <span className="text-cyan-400 text-[10px] font-mono font-bold uppercase tracking-wider">Choose Gateway</span>
                 </label>
                 
-                <div className="p-4 rounded-2xl bg-[#070D18] border border-cyan-500/40 shadow-lg space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shrink-0">
-                        <Building2 className="w-5 h-5 text-cyan-300" />
+                {/* Deposit Method Selection Grid */}
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  {/* Bank Transfer Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMethod('BANK');
+                      setNetwork('Bank Transfer (IBAN)');
+                      setPaypalBusyMsg(null);
+                      setErrorMsg(null);
+                    }}
+                    className={`p-3.5 rounded-2xl border text-left transition-all duration-300 cursor-pointer flex items-center gap-3 relative group overflow-hidden ${
+                      selectedMethod === 'BANK'
+                        ? 'bg-gradient-to-br from-[#0B1E38] via-[#071325] to-[#040C1A] border-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.35)] ring-2 ring-cyan-400/50 text-white scale-[1.02]'
+                        : 'bg-gradient-to-br from-[#070D1A] to-[#040810] border-cyan-500/30 hover:border-cyan-400/70 hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] text-slate-300'
+                    }`}
+                  >
+                    {/* Animated glowing backdrop highlight */}
+                    <div className="absolute -right-8 -top-8 w-20 h-20 bg-orange-500/10 rounded-full blur-xl group-hover:bg-orange-500/25 transition-all pointer-events-none" />
+                    
+                    <MashreqLogo className="w-9 h-9 group-hover:scale-110 transition-transform" />
+                    <div className="overflow-hidden relative z-10 flex-1">
+                      <div className="text-xs font-black uppercase tracking-wide truncate flex items-center justify-between gap-1">
+                        <span className="text-white">Bank IBAN</span>
+                        {/* Live Green Pulsing Beacon Dot */}
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
                       </div>
-                      <div>
-                        <div className="text-xs font-black text-white uppercase tracking-wide">
-                          {bankName}
-                        </div>
-                        <div className="text-[10px] font-mono text-slate-400">
-                          Direct Bank Deposit
-                        </div>
+                      <div className="text-[10px] font-mono text-cyan-400 truncate font-semibold flex items-center gap-1 mt-0.5">
+                        <span className="truncate">{bankName}</span>
                       </div>
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[10px] font-bold uppercase">
-                      Active
-                    </span>
-                  </div>
+                  </button>
 
-                  {/* Account Title */}
-                  <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-slate-400">Account Title:</span>
-                    <span className="text-white font-bold">{accountTitle}</span>
-                  </div>
+                  {/* PayPal Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMethod('PAYPAL');
+                      setNetwork('PayPal');
+                      setPaypalBusyMsg('System Busy: PayPal service is currently busy. Please try again later or use Bank Transfer.');
+                      setErrorMsg('System Busy: PayPal deposit channel is currently busy / under maintenance. Please select Bank Transfer.');
+                    }}
+                    className={`p-3.5 rounded-2xl border text-left transition-all duration-300 cursor-pointer flex items-center gap-3 relative group overflow-hidden ${
+                      selectedMethod === 'PAYPAL'
+                        ? 'bg-gradient-to-br from-[#0B1A3A] via-[#08132C] to-[#040A1A] border-blue-400 shadow-[0_0_25px_rgba(59,130,246,0.35)] ring-2 ring-blue-400/50 text-white scale-[1.02]'
+                        : 'bg-gradient-to-br from-[#081024] to-[#040814] border-blue-500/30 hover:border-blue-400/70 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] text-slate-300'
+                    }`}
+                  >
+                    {/* Animated glowing backdrop highlight */}
+                    <div className="absolute -right-8 -top-8 w-20 h-20 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/25 transition-all pointer-events-none" />
 
-                  {/* IBAN Preview with direct copy button */}
-                  <div className="flex items-center justify-between text-xs font-mono pt-1">
-                    <span className="text-slate-400">IBAN:</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-cyan-300 font-bold tracking-wider">{ibanNumber}</span>
-                      <button
-                        type="button"
-                        onClick={handleCopyIban}
-                        className="px-2 py-1 rounded-md bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 text-cyan-300 text-[10px] font-mono font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0"
-                        title="Copy IBAN"
-                      >
-                        {copiedIban ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-400" />
-                            <span className="text-emerald-300 text-[10px]">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3 text-cyan-300" />
-                            <span className="text-[10px]">Copy</span>
-                          </>
-                        )}
-                      </button>
+                    <PaypalLogo className="w-9 h-9 group-hover:scale-110 transition-transform" />
+                    <div className="overflow-hidden relative z-10 flex-1">
+                      <div className="text-xs font-black uppercase tracking-wide flex items-center justify-between gap-1">
+                        <span className="text-white">PayPal</span>
+                        {/* Live Blue Pulsing Beacon Dot */}
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono text-blue-300 truncate font-semibold flex items-center gap-1 mt-0.5">
+                        <span className="px-1.5 py-0.2 rounded bg-blue-500/20 border border-blue-400/40 text-[9px] font-bold text-blue-300 animate-pulse">Live Gateway</span>
+                      </div>
                     </div>
-                  </div>
+                  </button>
                 </div>
+
+                {/* Selected Method Details Box */}
+                {selectedMethod === 'BANK' ? (
+                  <div className="p-4 rounded-2xl bg-[#070D18] border border-cyan-500/40 shadow-lg space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shrink-0">
+                          <Building2 className="w-5 h-5 text-cyan-300" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-black text-white uppercase tracking-wide">
+                            {bankName}
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-400">
+                            Direct Bank Deposit
+                          </div>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[10px] font-bold uppercase">
+                        Active
+                      </span>
+                    </div>
+
+                    {/* Account Title */}
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-slate-400">Account Title:</span>
+                      <span className="text-white font-bold">{accountTitle}</span>
+                    </div>
+
+                    {/* IBAN Preview with direct copy button */}
+                    <div className="flex items-center justify-between text-xs font-mono pt-1">
+                      <span className="text-slate-400">IBAN:</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-cyan-300 font-bold tracking-wider">{ibanNumber}</span>
+                        <button
+                          type="button"
+                          onClick={handleCopyIban}
+                          className="px-2 py-1 rounded-md bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 text-cyan-300 text-[10px] font-mono font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                          title="Copy IBAN"
+                        >
+                          {copiedIban ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-400" />
+                              <span className="text-emerald-300 text-[10px]">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3 text-cyan-300" />
+                              <span className="text-[10px]">Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* PayPal Details Box with System Busy Notification */
+                  <div className="p-4 rounded-2xl bg-[#090D1A] border border-blue-500/50 shadow-lg space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <PaypalLogo className="w-9 h-9 shrink-0" />
+                        <div>
+                          <div className="text-xs font-black text-white uppercase tracking-wide">
+                            PayPal (Live Gateway)
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-400">
+                            Instant Online Payment
+                          </div>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono text-[10px] font-bold uppercase animate-pulse">
+                        System Busy
+                      </span>
+                    </div>
+
+                    {/* System Busy Notice */}
+                    <div className="p-3 bg-amber-500/15 border border-amber-500/40 rounded-xl text-amber-300 text-xs font-medium flex items-center gap-2 shadow-inner">
+                      <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span className="font-bold">System Busy: PayPal service is currently busy. Please try again later or use Bank Transfer.</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Share Payment Slip on WhatsApp Requirement Box */}
@@ -426,16 +586,16 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-black text-white uppercase tracking-wider">Share Payment Deposit Slip</h4>
-                    <p className="text-[11px] text-emerald-400 font-mono font-bold">WhatsApp: 03711386489</p>
+                    <p className="text-[11px] text-emerald-400 font-mono font-bold">Live WhatsApp Support</p>
                   </div>
                 </div>
 
                 <p className="text-xs text-slate-200 font-medium leading-relaxed">
-                  Please share your payment deposit slip on Dollar Craft&apos;s official WhatsApp number: <strong className="text-emerald-400 font-mono text-sm underline">03711386489</strong>.
+                  Please share your payment deposit slip directly on Dollar Craft&apos;s official WhatsApp support channel.
                 </p>
 
                 <a
-                  href={`https://wa.me/923711386489?text=${encodeURIComponent(`Hello Dollar Craft, I am sending my payment deposit slip for $${amount} USD deposit in ${activePlan.name}.`)}`}
+                  href={`/api/whatsapp-support?text=${encodeURIComponent(`Hello Dollar Craft, I am sending my payment deposit slip for $${amount} USD deposit in ${activePlan.name}.`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-950/60 transition-all cursor-pointer border border-emerald-400/50 hover:scale-[1.01]"
@@ -479,9 +639,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-400/50 flex items-center justify-center text-cyan-300 shadow-inner">
-                      <Building2 className="w-5 h-5" />
-                    </div>
+                    <MashreqLogo className="w-10 h-10" />
                     <div>
                       <span className="text-sm font-black text-white uppercase tracking-wider block">
                         {bankName}
@@ -584,16 +742,16 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-black text-white uppercase tracking-wider">Send Slip to Official WhatsApp</h4>
-                    <p className="text-[11px] text-emerald-400 font-mono font-bold">Number: 03711386489</p>
+                    <p className="text-[11px] text-emerald-400 font-mono font-bold">Instant Live Verification</p>
                   </div>
                 </div>
 
                 <p className="text-xs text-slate-200 font-medium leading-relaxed">
-                  Payment deposit slip Dollar Craft ke official WhatsApp number per share karo. Yeh hai number: <strong className="text-emerald-400 font-mono text-sm underline">03711386489</strong>.
+                  Payment deposit slip Dollar Craft ke official WhatsApp button par click karke direct share karein.
                 </p>
 
                 <a
-                  href={`https://wa.me/923711386489?text=${encodeURIComponent(`Hello Dollar Craft, I have transferred $${amount} USD to IBAN ${ibanNumber}. Here is my payment deposit slip.`)}`}
+                  href={`/api/whatsapp-support?text=${encodeURIComponent(`Hello Dollar Craft, I have transferred $${amount} USD to IBAN ${ibanNumber}. Here is my payment deposit slip.`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-950/60 transition-all cursor-pointer border border-emerald-400/50 hover:scale-[1.01]"
@@ -615,7 +773,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               <div className="bg-amber-500/10 p-3.5 rounded-xl border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5 font-medium">
                 <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
                 <span>
-                  Please transfer exact amount (${amount}.00) to IBAN <strong className="text-white font-mono">{ibanNumber}</strong>, then send your slip on WhatsApp (<strong className="text-emerald-400">03711386489</strong>).
+                  Please transfer exact amount (${amount}.00) to IBAN <strong className="text-white font-mono">{ibanNumber}</strong>, then send your slip on live WhatsApp support.
                 </span>
               </div>
 

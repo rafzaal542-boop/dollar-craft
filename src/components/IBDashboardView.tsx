@@ -111,7 +111,7 @@ export const IBDashboardView: React.FC<IBDashboardViewProps> = ({
       fetchIBData(false);
     }, 4000);
     return () => clearInterval(interval);
-  }, [currentUser.id]);
+  }, [currentUser?.id]);
 
   const handleCopyLink = (url?: string, key?: string) => {
     const targetUrl = url || data?.referralLink;
@@ -240,7 +240,7 @@ export const IBDashboardView: React.FC<IBDashboardViewProps> = ({
         <div className="relative z-10 space-y-6">
           
           {/* Header Badges */}
-          {currentUser.ibStatus === 'APPROVED' && (
+          {currentUser?.ibStatus === 'APPROVED' && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-mono font-black uppercase flex items-center gap-1.5 shadow-sm">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" /> ACTIVE IB PARTNER
@@ -254,11 +254,11 @@ export const IBDashboardView: React.FC<IBDashboardViewProps> = ({
               <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight uppercase leading-tight">
                 BECOME AN IB PROGRAM <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-teal-300 to-emerald-400">
-                  PAY $7000 AND EARN 20% PER REFERRAL
+                  PAY $7000 AND EARN 10% PER REFERRAL
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 font-mono leading-relaxed">
-                Activate your official IB Membership for <span className="text-white font-bold">$7,000 USDT</span>. Your full $7,000 deposit is 100% credited directly into your main trading balance while unlocking institutional partner status to earn an instant <span className="text-amber-300 font-black">20% direct commission</span> on every referral!
+                Activate your official IB Membership for <span className="text-white font-bold">$7,000 USDT</span>. Your full $7,000 deposit is 100% credited directly into your main trading balance while unlocking institutional partner status to earn an instant <span className="text-amber-300 font-black">10% direct commission</span> on every referral!
               </p>
             </div>
 
@@ -277,13 +277,13 @@ export const IBDashboardView: React.FC<IBDashboardViewProps> = ({
       </div>
 
       {/* IB Status Alert Banner */}
-      {currentUser.ibStatus === 'PENDING' && (
+      {currentUser?.ibStatus === 'PENDING' && (
         <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-transparent border border-amber-500/40 text-amber-200 text-xs font-mono flex items-start gap-3.5 shadow-lg">
           <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
           <div>
             <span className="font-black text-amber-300 text-sm uppercase block">IB Membership Payment Pending Verification</span>
             <p className="text-xs text-amber-200/80 mt-1 leading-relaxed">
-              Your $7,000 USDT deposit verification is in progress by our compliance team. Once confirmed: 1. Full $7,000 credited to your main balance, 2. IB Status activated, 3. 20% upline referral commission dispatched automatically.
+              Your $7,000 USDT deposit verification is in progress by our compliance team. Once confirmed: 1. Full $7,000 credited to your main balance, 2. IB Status activated, 3. 10% upline referral commission dispatched automatically.
             </p>
           </div>
         </div>
@@ -359,11 +359,11 @@ export const IBDashboardView: React.FC<IBDashboardViewProps> = ({
             </span>
           </div>
           <div className="text-3xl font-black font-mono text-emerald-400 tracking-tight flex items-baseline gap-2">
-            <span>{currentUser.ibMembershipsSold || (data?.commissions?.filter(c => parseFloat(c.commissionAmount) >= 1400).length || 0)}</span>
+            <span>{currentUser?.ibMembershipsSold || (data?.commissions?.filter(c => parseFloat(c.commissionAmount) >= 700).length || 0)}</span>
             <span className="text-xs text-slate-400 font-bold uppercase">Units</span>
           </div>
           <p className="text-[11px] text-slate-400 mt-2 font-mono flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-emerald-400" /> Earn 20% ($1,400) per sale
+            <Zap className="w-3.5 h-3.5 text-emerald-400" /> Earn 10% ($700) per sale
           </p>
         </div>
 

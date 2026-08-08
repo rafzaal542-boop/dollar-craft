@@ -38,6 +38,7 @@ interface CustomerDashboardViewProps {
   onOpenMasterPlan?: () => void;
   onOpenAuth?: (mode?: 'login' | 'signup') => void;
   onOpenInternalTransfer?: () => void;
+  onRefreshData?: () => void;
 }
 
 export const CustomerDashboardView: React.FC<CustomerDashboardViewProps> = ({
@@ -47,7 +48,8 @@ export const CustomerDashboardView: React.FC<CustomerDashboardViewProps> = ({
   onOpenWithdraw,
   onOpenMasterPlan,
   onOpenAuth,
-  onOpenInternalTransfer
+  onOpenInternalTransfer,
+  onRefreshData
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'profile' | 'deposits' | 'transfers'>('profile');
@@ -72,6 +74,12 @@ export const CustomerDashboardView: React.FC<CustomerDashboardViewProps> = ({
         if (res.ok) {
           const data = await res.json();
           setInternalTransfers(data.transfers || []);
+          if (
+            data.principalBalance &&
+            parseFloat(data.principalBalance) > parseFloat(currentUser?.principalBalance || '0')
+          ) {
+            if (onRefreshData) onRefreshData();
+          }
         }
       } catch (err) {
         console.warn('Failed to fetch user internal transfers:', err);
@@ -123,7 +131,7 @@ export const CustomerDashboardView: React.FC<CustomerDashboardViewProps> = ({
       !itx.toWalletType
     ) {
       const exists = allCombinedDeposits.some(
-        (d) => d.txHash === itx.transferId || d.id.includes(itx.transferId)
+        (d) => d && ((d.txHash && itx.transferId && d.txHash === itx.transferId) || (d.id && itx.transferId && d.id.includes(itx.transferId)))
       );
       if (!exists) {
         allCombinedDeposits.unshift({
@@ -234,44 +242,38 @@ export const CustomerDashboardView: React.FC<CustomerDashboardViewProps> = ({
         /* LOGGED IN FULL CUSTOMER DASHBOARD PAGE */
         <div className="space-y-8">
           
-          {/* TOP CARDS: FINANCIAL OVERVIEW */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* TOP CARDS: FINANCIAL OVERVIEW (3 Full-Width Rows / Lines for Maximum Digit Visibility) */}
+          <div className="grid grid-cols-1 gap-4">
             
-            {/* Card 1: Total Net Portfolio */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0B152C] to-[#060D1E] border border-cyan-500/30 space-y-3 shadow-xl hover:border-cyan-400/60 transition-all">
+            {/* Row 1: Total Net Portfolio */}
+            <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-[#0B152C] via-[#081226] to-[#060D1E] border border-cyan-500/40 space-y-2.5 shadow-xl hover:border-cyan-400/70 transition-all">
               <div className="flex items-center justify-between text-slate-400 font-mono text-xs">
-                <span className="uppercase font-bold flex items-center gap-1.5 text-cyan-300">
-                  <Wallet className="w-4 h-4 text-cyan-400" />
+                <span className="uppercase font-bold flex items-center gap-2 text-cyan-300 tracking-wider">
+                  <Wallet className="w-4.5 h-4.5 text-cyan-400" />
                   TOTAL BALANCE
                 </span>
               </div>
-              <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
+              <div className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight break-all">
                 ${calculateTotalBalance()}
               </div>
             </div>
 
-            {/* Card 2: Active Principal Deposit */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0B152C] to-[#060D1E] border border-emerald-500/40 space-y-3 shadow-xl hover:border-emerald-400/60 transition-all">
+            {/* Row 2: Active Principal Deposit */}
+            <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-[#0B152C] via-[#081226] to-[#060D1E] border border-emerald-500/40 space-y-2.5 shadow-xl hover:border-emerald-400/70 transition-all">
               <div className="flex items-center justify-between text-slate-400 font-mono text-xs">
-                <span className="uppercase font-bold flex items-center gap-1.5 text-emerald-400">
-                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                <span className="uppercase font-bold flex items-center gap-2 text-emerald-400 tracking-wider">
+                  <DollarSign className="w-4.5 h-4.5 text-emerald-400" />
                   TOTAL DEPOSIT
                 </span>
-                {internalTransfers.length > 0 && (
-                  <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold uppercase flex items-center gap-1">
-                    <Send className="w-3 h-3 text-purple-400" />
-                    {internalTransfers.length} TRANSFER{internalTransfers.length > 1 ? 'S' : ''}
-                  </span>
-                )}
               </div>
-              <div className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono tracking-tight">
+              <div className="text-3xl sm:text-4xl font-black text-emerald-400 font-mono tracking-tight break-all">
                 ${getCalculatedTotalDeposit()}
               </div>
               {internalTransfers.length > 0 && (
-                <div className="text-[11px] font-mono text-slate-400 flex items-center justify-between pt-2 border-t border-slate-800/80">
+                <div className="text-xs font-mono text-slate-400 flex items-center justify-between pt-2 border-t border-slate-800/80">
                   <span className="flex items-center gap-1 text-purple-300">
-                    <Send className="w-3 h-3" />
-                    Internal Transfer Credit:
+                    <Send className="w-3.5 h-3.5" />
+                    you earn this deposit for 240 days:
                   </span>
                   <span className="text-emerald-300 font-bold">
                     +${internalTransfers.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0).toFixed(2)}
@@ -280,36 +282,16 @@ export const CustomerDashboardView: React.FC<CustomerDashboardViewProps> = ({
               )}
             </div>
 
-            {/* Card 3: Earned Yield */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0B152C] to-[#060D1E] border border-slate-800 space-y-3 shadow-xl hover:border-amber-500/40 transition-all">
+            {/* Row 3: Daily Profit / Earned Yield */}
+            <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-[#0B152C] via-[#081226] to-[#060D1E] border border-amber-500/40 space-y-2.5 shadow-xl hover:border-amber-400/70 transition-all">
               <div className="flex items-center justify-between text-slate-400 font-mono text-xs">
-                <span className="uppercase font-bold flex items-center gap-1.5 text-amber-300">
-                  <TrendingUp className="w-4 h-4 text-amber-400" />
+                <span className="uppercase font-bold flex items-center gap-2 text-amber-300 tracking-wider">
+                  <TrendingUp className="w-4.5 h-4.5 text-amber-400" />
                   DAILY PROFIT
                 </span>
               </div>
-              <div className="text-2xl sm:text-3xl font-black text-amber-300 font-mono tracking-tight">
+              <div className="text-3xl sm:text-4xl font-black text-amber-300 font-mono tracking-tight break-all">
                 ${(parseFloat(currentUser.earnedYield || '0') || 0).toFixed(4)}
-              </div>
-            </div>
-
-            {/* Card 4: Referral Bonus (5% Auto Commission) */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0B152C] to-[#060D1E] border border-amber-500/40 space-y-3 shadow-xl hover:border-amber-400/60 transition-all">
-              <div className="flex items-center justify-between text-slate-400 font-mono text-xs">
-                <span className="uppercase font-bold flex items-center gap-1.5 text-amber-300">
-                  <Gift className="w-4 h-4 text-amber-400" />
-                  REFERRAL BONUS
-                </span>
-                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold uppercase border border-amber-500/30">
-                  5% AUTO
-                </span>
-              </div>
-              <div className="text-2xl sm:text-3xl font-black text-amber-300 font-mono tracking-tight">
-                ${(parseFloat(currentUser?.ibTotalCommission || currentUser?.ibWithdrawableCommission || '0') || 0).toFixed(2)}
-              </div>
-              <div className="text-[11px] font-mono text-slate-400 flex items-center justify-between pt-1">
-                <span>Direct Deposit Bonus:</span>
-                <span className="text-amber-400 font-bold">5% Per Referred Deposit</span>
               </div>
             </div>
 
@@ -413,7 +395,7 @@ export const CustomerDashboardView: React.FC<CustomerDashboardViewProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400 text-[11px] uppercase block">Account ID</span>
                     <button
-                      onClick={() => handleCopy(currentUser.id, 'accId')}
+                      onClick={() => handleCopy(currentUser?.id || '', 'accId')}
                       className="text-[10px] font-bold text-cyan-300 hover:text-cyan-200 flex items-center gap-1 cursor-pointer"
                     >
                       {copiedField === 'accId' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
@@ -421,7 +403,7 @@ export const CustomerDashboardView: React.FC<CustomerDashboardViewProps> = ({
                     </button>
                   </div>
                   <div className="text-xs font-semibold text-cyan-300 break-all select-all pt-0.5">
-                    {currentUser.id}
+                    {currentUser?.id || 'N/A'}
                   </div>
                 </div>
 
